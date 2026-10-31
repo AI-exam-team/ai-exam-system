@@ -119,5 +119,4 @@
 1. 将 `.github/CODEOWNERS` 中的 `@TODO-replace-*` 占位符替换为真实 GitHub 用户名 / 团队名。
 2. 配置 `main` 分支保护：要求 PR、至少 1 名评审、CI 通过。
 3. 按 `.github/ISSUE_TEMPLATE/` 与看板方案创建标签与看板列。
-
 第 6 周空 PR 演练：仅文档变更，无业务代码。
