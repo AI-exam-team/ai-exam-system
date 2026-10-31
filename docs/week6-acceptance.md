@@ -79,6 +79,7 @@
 `git log --oneline --graph --all` 摘要：
 
 ```text
+* <报告提交> docs(repo): 编写第 6 周集成与验收报告
 * 4d6768f docs(repo): 调整演练标记为单行变更（Issue-104）
 * 842308a docs(repo): 演练空 PR 流程（Issue-104）
 *   cf8cf62 docs(plans): 合入看板与协作方案（Issue-103）
@@ -100,7 +101,7 @@
 
 | 分支 | HEAD | 状态 |
 | --- | --- | --- |
-| `main` | `cf8cf62` | 主分支，已含三次 `--no-ff` 合并 |
+| `main` | 以 `git log -1 main` 为准 | 主分支，已含三次 `--no-ff` 合并及本报告提交 |
 | `docs/issue-101-context` | `adb1037` | 已合并，保留 |
 | `docs/issue-102-rules` | `2f7fe0b` | 已合并，保留 |
 | `docs/issue-103-plans` | `f9a2e03` | 已合并，保留 |
