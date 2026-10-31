@@ -6,7 +6,7 @@
 | 验收人 | 集成与契约负责人（integrator） |
 | 仓库 | `D:/AI智能考试系统`（本地独立仓库） |
 | 当前分支 | `main` |
-| 远端 | **未连接，未 push** |
+| 远端 | 已接入 `AI-exam-team/ai-exam-system`；`main` 与四条分支已推送 |
 | 业务代码 | 无（`src/`、`tests/` 仅 `.gitkeep`） |
 
 ---
@@ -149,4 +149,18 @@
 
 第 6 周文档类交付物齐全，锁定决策在全仓库一致；本地 Git 历史符合“骨架 → 三次文档分支 `--no-ff` 合并 → 空 PR 分支保留”的要求；`main` 工作区干净，`src/`、`tests/` 无业务代码，未连接远端、未 push。**第 6 周集成验收通过。**
 
-遗留项（远端、看板实建、真实 PR、spec 冻结、分工确认）已列入第四节，转入第 7 周执行。
+遗留项（看板实建、PR 评审、spec 冻结、分工确认）已列入第四节，转入第 7 周执行。
+
+---
+
+## 七、远端落地记录（2026-10-31 补记）
+
+| 项目 | 结果 |
+| --- | --- |
+| 远端仓库 | <https://github.com/AI-exam-team/ai-exam-system> |
+| 推送分支 | `main`、`docs/issue-101-context`、`docs/issue-102-rules`、`docs/issue-103-plans`、`feature/issue-104-empty-pr` |
+| 空 PR | PR #1：`feature/issue-104-empty-pr` → `main`，已绑定 Issue #5，待非作者评审 |
+| Issues | #2～#11，对应规划 Issue-101～110；已完成项已关闭，Issue #5（空 PR）与 Issue #8（看板）保持 open |
+| 标签 | 已创建 spec / feature / test / docs / infra / qbank / exam / grading（bug 为仓库默认标签） |
+| Projects 看板 | **未创建**：当前 token 仅含 `gist, repo, workflow`，缺少 `project` 权限；需组长在网页端创建，或提供带 project 权限的 token |
+| 评审要求 | PR 合并前需至少 1 名非作者评审；合并后 Issue #5 关闭 |
