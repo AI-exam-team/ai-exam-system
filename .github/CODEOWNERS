@@ -1,0 +1,39 @@
+# CODEOWNERS
+#
+# 注意：本仓库第 6 周尚未接入 GitHub 远端，以下用户名为占位符。
+# 接入远端后，请将 @TODO-replace-* 替换为真实 GitHub 用户名或团队名，
+# 并确认仓库 Settings → Code owners 已生效。
+#
+# 语法：模式 负责人...
+# 后出现的规则优先级更高。
+
+# 默认负责人：集成负责人
+*                                   @TODO-replace-integration-lead
+
+# 项目上下文、规格与 AI 规则：集成负责人把关，保证全文一致
+/context.md                         @TODO-replace-integration-lead
+/agent-rules.md                     @TODO-replace-integration-lead
+/spec/                              @TODO-replace-integration-lead
+/adr/                               @TODO-replace-integration-lead
+/plans/                             @TODO-replace-integration-lead
+
+# 模块路由（按目录）
+/src/modules/qbank/                 @TODO-replace-qbank-team
+/src/modules/exam/                  @TODO-replace-exam-team
+/src/modules/grading/               @TODO-replace-grading-team
+
+# 前端与后端公共代码
+/src/main/                          @TODO-replace-integration-lead
+/src/frontend/                      @TODO-replace-frontend-team
+
+# 测试
+/tests/                             @TODO-replace-integration-lead
+
+# 协作与仓库配置
+/.github/                           @TODO-replace-integration-lead
+/README.md                          @TODO-replace-integration-lead
+/.gitignore                         @TODO-replace-integration-lead
+
+# 技术探针与资料归档
+/docs/spike/                        @TODO-replace-integration-lead
+/docs/reference/                    @TODO-replace-integration-lead
