@@ -1,6 +1,6 @@
 # GitHub Projects 看板方案
 
-> 状态：第 6 周本地方案稿。仓库尚未连接 GitHub 远端，本文只定义规则与接入步骤，不涉及实际操作。
+> 状态：仓库已于 2026-10-31 接入 GitHub；看板已创建：<https://github.com/orgs/AI-exam-team/projects/2>，5 个状态列已配置。其余字段、自动化、仓库关联与成员权限按第六节继续确认。
 > 看板是**进度唯一依据**；口头同步、聊天记录、文档里的“已完成”都不算数，以看板卡片状态为准。
 
 ## 一、看板列（Status）
@@ -82,7 +82,20 @@
 
 自动化只做“机械流转”，不替代人工排期与验收。
 
-## 六、接入远端后的创建步骤
+## 六、接入远端与创建步骤
+
+### 6.0 实际落地记录（2026-10-31）
+
+| 项目 | 状态 |
+| --- | --- |
+| 远端仓库 | <https://github.com/AI-exam-team/ai-exam-system> |
+| 看板 | <https://github.com/orgs/AI-exam-team/projects/2>，名称「AI 智能考试系统」 |
+| 5 个状态列 | 已配置：`Backlog / This Week / In Progress / Review / Done` |
+| Issues | #2～#11 已创建，对应规划 Issue-101～110 |
+| 标签 | spec / feature / test / docs / infra / qbank / exam / grading 已创建 |
+| 待确认 | 仓库关联、Module/Priority 字段、Workflows、成员访问、Issue 在列中的摆放 |
+
+> 以下 1～8 步保留为操作指南；已完成部分以 6.0 表为准。
 
 前置：仓库已推到 GitHub，6 名成员有写权限，CODEOWNERS 占位符已替换。
 
@@ -118,6 +131,8 @@
 
 ## 七、本周落地状态
 
-- 本文与 `plans/week6-issues.md` 为本地方案，**尚未执行任何 GitHub 操作**。
-- 周会时按 `week6-issues.md` 将 Issue 逐条登记（可先写在 Issue 清单中，接远端后批量创建）。
-- 远端接入属于后续任务，本周不 push、不建远端仓库。
+- 远端仓库已接入，`main` 与四条分支已推送。
+- Issues #2～#11 已创建并打标签；已完成项已关闭，Issue #5（空 PR）与 Issue #8（看板）保持 open。
+- 看板已创建并配置 5 列：<https://github.com/orgs/AI-exam-team/projects/2>。
+- 空 PR：PR #1（`feature/issue-104-empty-pr` → `main`），已绑定 Issue #5，待非作者评审。
+- 待完成：把 Issue 放入看板并设置状态、关联仓库、配置字段与 Workflows、组员访问权限、CODEOWNERS 占位符替换。

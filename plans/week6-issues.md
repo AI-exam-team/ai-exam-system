@@ -185,7 +185,7 @@ Issue-101（骨架，已完成）
 | Issue-104 | #5 | 执行空 PR 协作演练 | open（PR #1 待评审） |
 | Issue-105 | #6 | 制定 AI 协作规则 | closed |
 | Issue-106 | #7 | 搭建 spec 骨架与编写规范 | closed |
-| Issue-107 | #8 | 建立 Projects 看板与标签体系 | open（看板待建） |
+| Issue-107 | #8 | 建立 Projects 看板与标签体系 | closed（看板：<https://github.com/orgs/AI-exam-team/projects/2>） |
 | Issue-108 | #9 | 明确模块分工与合并规则 | closed |
 | Issue-109 | #10 | 建立 ADR 模板与记录规范 | closed |
 | Issue-110 | #11 | 制定技术探针规范 | closed |

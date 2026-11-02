@@ -124,7 +124,7 @@
 ## 四、仍未完成事项
 
 1. **远端未接入**：未创建 GitHub 仓库、未添加 `origin`、未 push 任何分支。
-2. **Projects 看板未实建**：`plans/github-projects.md` 仅为方案，5 列、字段、标签、自动化均待远端创建。
+2. **Projects 看板部分完成**：看板已创建并配置 5 列（<https://github.com/orgs/AI-exam-team/projects/2>）；Issue 摆放、字段、Workflows、仓库关联与成员访问待确认。
 3. **真实 PR 未创建**：Issue-104 仅完成本地分支与文档；PR、评审、合并、看板流转待远端接入后补做。
 4. **Issue 编号未落地**：`Issue-101`～`110` 为规划编号，需在 GitHub 创建后补实际编号映射。
 5. **spec 未冻结**：`spec/spec-v0.1.md` 仍为草稿；FR 编号与模块 spec 待评审后分配。
@@ -162,5 +162,5 @@
 | 空 PR | PR #1：`feature/issue-104-empty-pr` → `main`，已绑定 Issue #5，待非作者评审 |
 | Issues | #2～#11，对应规划 Issue-101～110；已完成项已关闭，Issue #5（空 PR）与 Issue #8（看板）保持 open |
 | 标签 | 已创建 spec / feature / test / docs / infra / qbank / exam / grading（bug 为仓库默认标签） |
-| Projects 看板 | **未创建**：当前 token 仅含 `gist, repo, workflow`，缺少 `project` 权限；需组长在网页端创建，或提供带 project 权限的 token |
+| Projects 看板 | 已创建：<https://github.com/orgs/AI-exam-team/projects/2>，5 个状态列已配置；Issue 摆放、字段、Workflows、仓库关联与成员访问待确认 |
 | 评审要求 | PR 合并前需至少 1 名非作者评审；合并后 Issue #5 关闭 |
