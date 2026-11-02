@@ -30,7 +30,10 @@
 ├── tests/                        # 测试目录（第 6 周仅 .gitkeep 占位）
 ├── docs/
 │   ├── spike/                    # 技术探针（技术预研）记录
-│   └── reference/                # 原始资料归档（课程资料、外部参考）
+│   ├── reference/                # 原始资料归档（课程资料、外部参考）
+│   ├── pr-rehearsal.md           # 空 PR 演练步骤
+│   ├── team-guide.md             # 团队协作指南（仓库架构 + GitHub 流程）
+│   └── week6-acceptance.md       # 第 6 周验收报告
 └── .github/
     ├── CODEOWNERS                # 目录 → 负责人路由（占位，接远端后替换）
     ├── pull_request_template.md  # PR 模板
@@ -48,8 +51,10 @@
 | [spec/](./spec/) | 需求规格说明（SRS、模块 spec） |
 | [adr/](./adr/) | 架构决策记录 |
 | [plans/](./plans/) | 迭代计划与技术方案 |
+| [docs/team-guide.md](./docs/team-guide.md) | **团队协作指南：仓库架构、分支/PR/评审/看板流程** |
 | [docs/spike/](./docs/spike/) | 技术探针规则与记录 |
 | [docs/reference/](./docs/reference/) | 原始资料归档说明 |
+| [docs/week6-acceptance.md](./docs/week6-acceptance.md) | 第 6 周集成验收报告 |
 | [.github/pull_request_template.md](./.github/pull_request_template.md) | PR 提交模板 |
 | [.github/ISSUE_TEMPLATE/](./.github/ISSUE_TEMPLATE/) | Issue 模板（task / bug） |
 
@@ -106,16 +111,19 @@
 5. **代码边界**：第 6 周不得提交业务代码；后续实现须遵守 `agent-rules.md` 中的 AI 协作约定。
 6. **评审**：至少 1 名非作者评审通过后方可合并；目录负责人见 `.github/CODEOWNERS`。
 
-## 远端说明（待接入）
+## 远端与协作入口
 
-本周**暂不连接远端**：
+- 仓库：<https://github.com/AI-exam-team/ai-exam-system>
+- 看板：<https://github.com/orgs/AI-exam-team/projects/2>
+- 空 PR：<https://github.com/AI-exam-team/ai-exam-system/pull/1>
 
-- 不执行 `git push`
-- 不创建 GitHub 远端仓库
-- 仓库仅在本地 `D:/AI智能考试系统` 独立初始化，与个人主页仓库 `D:/Vibe coding` 完全隔离
+当前已推送 `main` 与四条文档分支，Issues #2～#11 与 PR #1 已创建。
 
-接入 GitHub 后需完成以下替换：
+仍需完成：
 
-1. 将 `.github/CODEOWNERS` 中的 `@TODO-replace-*` 占位符替换为真实 GitHub 用户名 / 团队名。
-2. 配置 `main` 分支保护：要求 PR、至少 1 名评审、CI 通过。
-3. 按 `.github/ISSUE_TEMPLATE/` 与看板方案创建标签与看板列。
+1. 替换 `.github/CODEOWNERS` 中的 `@TODO-replace-*` 占位符。
+2. 配置 `main` 分支保护：要求 PR、至少 1 名非作者评审。
+3. 完善看板字段、Workflows 与成员访问权限。
+4. 非作者评审 PR #1 后合并。
+
+团队协作细节见 [`docs/team-guide.md`](./docs/team-guide.md)。

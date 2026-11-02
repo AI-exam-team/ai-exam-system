@@ -26,6 +26,7 @@
 | Issue 清单 | `plans/week6-issues.md` | 已合入 `main` |
 | 模块分工与合并规则 | `plans/module-ownership.md` | 已合入 `main` |
 | 空 PR 演练文档 | `docs/pr-rehearsal.md` | 已合入 `main` |
+| 团队协作指南 | `docs/team-guide.md` | 已合入 `main`（仓库架构 + GitHub 流程） |
 | 技术探针规范 | `docs/spike/README.md` | 已合入 `main` |
 | 仓库骨架与模板 | `README.md`、`.gitignore`、`.github/`、各目录 `.gitkeep` | 初始提交 |
 | 空 PR 演练分支 | `feature/issue-104-empty-pr` | **保留未合并**，模拟等待评审 |
