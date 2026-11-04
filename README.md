@@ -121,9 +121,16 @@
 
 仍需完成：
 
+ feature/issue-104-empty-pr
+1. 将 `.github/CODEOWNERS` 中的 `@TODO-replace-*` 占位符替换为真实 GitHub 用户名 / 团队名。
+2. 配置 `main` 分支保护：要求 PR、至少 1 名评审、CI 通过。
+3. 按 `.github/ISSUE_TEMPLATE/` 与看板方案创建标签与看板列。
+第 6 周空 PR 演练：仅文档变更，无业务代码。
+
 1. 替换 `.github/CODEOWNERS` 中的 `@TODO-replace-*` 占位符。
 2. 配置 `main` 分支保护：要求 PR、至少 1 名非作者评审。
 3. 完善看板字段、Workflows 与成员访问权限。
 4. 非作者评审 PR #1 后合并。
 
 团队协作细节见 [`docs/team-guide.md`](./docs/team-guide.md)。
+ main
