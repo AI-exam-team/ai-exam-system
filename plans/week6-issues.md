@@ -1,6 +1,6 @@
 # 第 6 周 Issue 清单
 
-> 本文是**本地规划清单**，用于看板登记与分工确认。仓库尚未连接 GitHub 远端，`Issue-101`～`Issue-110` 为规划编号；接入远端后以 GitHub 实际编号为准，并在本文补一列映射。
+> 本文是**本地规划清单**，用于看板登记与分工确认。仓库已于 2026-10-31 接入 GitHub 远端 `AI-exam-team/ai-exam-system`；`Issue-101`～`Issue-110` 为规划编号，实际编号见第五节。
 > 负责人一律使用**角色名**或“待认领”，真人绑定由小组周会确认，不在此擅自指定。
 > 分支命名统一为 `<type>/issue-<规划编号>-<简述>`，`type` 取 `feature` / `docs` / `fix`；仅 `Issue-104` 按演练要求固定为 `feature/issue-104-empty-pr`。
 > **本地提交口径**：第 6 周实际本地历史按集成验收脚本建立 `docs/issue-101-context`、`docs/issue-102-rules`、`docs/issue-103-plans`、`feature/issue-104-empty-pr` 四个分支；本表编号为规划编号，两者映射见 `docs/week6-acceptance.md`，接远端后以 GitHub 实际编号为准。
@@ -53,9 +53,9 @@
 - **模块/标签**：`docs`、`spec`
 - **负责人建议**：context-writer
 - **验收标准**：
-  - [ ] 列出 6 名成员、学号/班级（按课程要求，敏感字段脱敏或留空）
-  - [ ] 列出 3 个模块组与各组职责边界
-  - [ ] 列出仓库地址占位、课程名称、指导教师、周次
+  - [ ] 按课程模板填写项目名称、一句话简介、2 种用户角色、3 个核心实体、3 个核心模块
+  - [ ] 填写技术栈、唯一外部依赖 DeepSeek，以及与 `context.md` 一致的 4 条 Non-Goals
+  - [ ] 不写入学号、手机号等敏感个人信息
   - [ ] 信息表位置与 `context.md` 的引用互相可达
 - **关联 spec 占位**：`context.md` §基本信息表（占位）
 - **分支**：`docs/issue-103-project-basic-info`
@@ -67,10 +67,11 @@
 - **验收标准**：
   - [ ] 从 `main` 建立 `feature/issue-104-empty-pr` 分支
   - [ ] 仅修改 `README.md` 一行，不涉及业务代码
-  - [ ] 本地提交记录清晰，提交信息说明“演练”
-  - [ ] 按 `docs/pr-rehearsal.md` 填写完整 PR 描述模板（未接远端则保留草稿）
+  - [x] 本地提交记录清晰，提交信息说明“演练”
+  - [x] 按 `docs/pr-rehearsal.md` 填写完整 PR 描述模板
+  - [x] 已推送远端并创建 PR #1，PR 描述已绑定本 Issue
   - [ ] 至少 1 名非作者完成评审演练并给出结论
-  - [ ] **本周不执行 push**，远端接入后补做推送与合并
+  - [ ] 评审通过后合并
 - **关联 spec 占位**：无（流程演练）
 - **分支**：`feature/issue-104-empty-pr`
 
@@ -171,3 +172,23 @@ Issue-101（骨架，已完成）
 1. **先建 Issue 再干活**：接远端后按本清单逐个创建，标题保持“动词 + 对象”，创建后补 GitHub 实际编号到总览表。
 2. **规划编号 ≠ GitHub 编号**：分支名中的 `issue-104` 使用规划编号，避免因远端编号变化反复改名；PR 描述使用 GitHub 实际编号（如 `Closes #12`）。
 3. **负责人变更**：由 Owner 在 Issue 评论说明，禁止静默改派；看板 Owner 字段同步更新。
+
+## 五、GitHub 实际编号映射（2026-10-31）
+
+仓库：<https://github.com/AI-exam-team/ai-exam-system>
+
+| 规划编号 | GitHub 实际编号 | 标题 | 状态 |
+| --- | --- | --- | --- |
+| Issue-101 | #2 | 初始化仓库骨架与协作模板 | closed |
+| Issue-102 | #3 | 编写项目上下文文档 | closed |
+| Issue-103 | #4 | 编制小组项目基本信息表 | closed |
+| Issue-104 | #5 | 执行空 PR 协作演练 | open（PR #1 待评审） |
+| Issue-105 | #6 | 制定 AI 协作规则 | closed |
+| Issue-106 | #7 | 搭建 spec 骨架与编写规范 | closed |
+| Issue-107 | #8 | 建立 Projects 看板与标签体系 | closed（看板：<https://github.com/orgs/AI-exam-team/projects/2>） |
+| Issue-108 | #9 | 明确模块分工与合并规则 | closed |
+| Issue-109 | #10 | 建立 ADR 模板与记录规范 | closed |
+| Issue-110 | #11 | 制定技术探针规范 | closed |
+
+已完成项对应提交见 `docs/week6-acceptance.md`；空 PR 为 PR #1，目标分支 `main`，源分支 `feature/issue-104-empty-pr`。
+
