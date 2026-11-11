@@ -1,39 +1,38 @@
 # CODEOWNERS
 #
-# 注意：本仓库第 6 周尚未接入 GitHub 远端，以下用户名为占位符。
-# 接入远端后，请将 @TODO-replace-* 替换为真实 GitHub 用户名或团队名，
-# 并确认仓库 Settings → Code owners 已生效。
+# 2026-11-11：已将占位符替换为真实 GitHub 账号（6 人小组）。
+# 前端归属尚未确定，/src/frontend/ 暂保留占位符，确认后替换。
 #
 # 语法：模式 负责人...
 # 后出现的规则优先级更高。
 
 # 默认负责人：集成负责人
-*                                   @TODO-replace-integration-lead
+*                                   @Eternity1022
 
 # 项目上下文、规格与 AI 规则：集成负责人把关，保证全文一致
-/context.md                         @TODO-replace-integration-lead
-/agent-rules.md                     @TODO-replace-integration-lead
-/spec/                              @TODO-replace-integration-lead
-/adr/                               @TODO-replace-integration-lead
-/plans/                             @TODO-replace-integration-lead
+/context.md                         @Eternity1022
+/agent-rules.md                     @Eternity1022
+/spec/                              @Eternity1022
+/adr/                               @Eternity1022
+/plans/                             @Eternity1022
 
 # 模块路由（按目录）
-/src/modules/qbank/                 @TODO-replace-qbank-team
-/src/modules/exam/                  @TODO-replace-exam-team
-/src/modules/grading/               @TODO-replace-grading-team
+/src/modules/qbank/                 @sun-yx24 @causalwill
+/src/modules/exam/                  @Ransoo-1019 @Eternity1022
+/src/modules/grading/               @MoLuoOVO @aawebai
 
 # 前端与后端公共代码
-/src/main/                          @TODO-replace-integration-lead
+/src/main/                          @Eternity1022
 /src/frontend/                      @TODO-replace-frontend-team
 
 # 测试
-/tests/                             @TODO-replace-integration-lead
+/tests/                             @Eternity1022
 
 # 协作与仓库配置
-/.github/                           @TODO-replace-integration-lead
-/README.md                          @TODO-replace-integration-lead
-/.gitignore                         @TODO-replace-integration-lead
+/.github/                           @Eternity1022
+/README.md                          @Eternity1022
+/.gitignore                         @Eternity1022
 
 # 技术探针与资料归档
-/docs/spike/                        @TODO-replace-integration-lead
-/docs/reference/                    @TODO-replace-integration-lead
+/docs/spike/                        @Eternity1022
+/docs/reference/                    @Eternity1022
