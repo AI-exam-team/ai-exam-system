@@ -71,7 +71,7 @@ docs/spike/spike-<topic>/
 | SP-01 | DeepSeek 结构化评分输出、延迟与费用 | `docs/spike/spike-deepseek-grading/` | 左恩东 / 王麒博 | 计划中 | - |
 | SP-02 | MySQL 并发交卷幂等 | `docs/spike/spike-mysql-submit-idempotency/` | 钱斓轩 | 计划中 | - |
 | SP-03 | 自动交卷触发方式与调度漂移 | `docs/spike/spike-auto-submit-trigger/` | 李昕彤 / 钱斓轩 | 计划中 | - |
-| SP-04 | 长文本答案与 utf8mb4 存储 | `docs/spike/spike-mysql-text-storage/` | 孙宇萱 / 周裔 | 计划中 | - |
+| SP-04 | 长文本答案与 utf8mb4 存储 | `docs/spike/spike-mysql-text-storage/` | 周裔（主执行） / 孙宇萱（复核） | 已完成 | 可行 |
 
 ## 七、已确认事项
 
