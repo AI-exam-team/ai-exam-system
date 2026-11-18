@@ -138,6 +138,10 @@ qbank  ◄──── exam  ◄──── grading
 
 | 错误码 | HTTP | 场景 | 产生模块 | 状态 |
 | --- | --- | --- | --- | --- |
+| `VALIDATION_ERROR` | 400 | 通用参数校验失败（缺字段、类型错误、非法枚举） | integration / 各模块 | 待契约升版 |
+| `PAPER_NOT_FOUND` | 404 | 试卷不存在 | qbank / exam | 待契约升版 |
+| `QUESTION_NOT_ACTIVE` | 409 | 组卷引用非 `ACTIVE` 题目 | qbank | 待契约升版 |
+| `QUESTION_ALREADY_USED` | 409 | 题目被任一 `PUBLISHED` 试卷引用，禁止修改 | qbank | 待契约升版 |
 | `ANSWER_NOT_SUBMITTED` | 409 | 对 `DRAFT` 答卷触发 AI 初评 | grading | 待契约升版 |
 | `AI_GRADING_IN_PROGRESS` | 409 | 同一题初评处于 `PENDING` 时重复触发 | grading | 待契约升版 |
 | `INVALID_REVIEWED_SCORE` | 400 | 确认分非整数或不在 `[0, 题目分值]` | grading | 待契约升版 |
@@ -161,12 +165,307 @@ qbank  ◄──── exam  ◄──── grading
 
 | 方法 | 路径 | 说明 | 成功 | 主要失败 |
 | --- | --- | --- | --- | --- |
-| POST | `/api/v1/questions` | 建题（含评分点） | 201 `Question` | 409 `RUBRIC_SCORE_MISMATCH` / `RUBRIC_DESCRIPTION_VAGUE`、400 |
-| PUT | `/api/v1/questions/{id}` | 修改题目 | 200 `Question` | 404 `QUESTION_NOT_FOUND`、409、400 |
+| POST | `/api/v1/questions` | 建题（含评分点） | 201 `Question` | 409 `RUBRIC_SCORE_MISMATCH` / `RUBRIC_DESCRIPTION_VAGUE`、400 `VALIDATION_ERROR` |
+| PUT | `/api/v1/questions/{id}` | 修改题目 | 200 `Question` | 404 `QUESTION_NOT_FOUND`、409 `QUESTION_ALREADY_USED`、400 `VALIDATION_ERROR` |
 | GET | `/api/v1/questions?status=ACTIVE` | 建卷选题 | 200 `Question[]` | 401 |
-| POST | `/api/v1/papers` | 组卷，保存 `DRAFT` | 201 `Paper` | 409 `PAPER_SCORE_MISMATCH`、400 |
-| GET | `/api/v1/papers/{id}` | 试卷详情 | 200 `Paper` | 404、403 |
+| POST | `/api/v1/papers` | 组卷，保存 `DRAFT` | 201 `Paper` | 409 `PAPER_SCORE_MISMATCH` / `QUESTION_NOT_ACTIVE`、400 `VALIDATION_ERROR` |
+| GET | `/api/v1/papers/{id}` | 试卷详情 | 200 `Paper` | 404 `PAPER_NOT_FOUND`、403 |
 | GET | `/api/v1/papers?status=DRAFT` | 待发布试卷列表 | 200 `Paper[]` | 401 |
+| GET | `/api/v1/papers/{id}/snapshot-diff` | 草稿快照对比（只读） | 200 `SnapshotDiff[]` | 404 `PAPER_NOT_FOUND`、403 |
+
+> 契约第 5 节未覆盖的失败场景，优先使用 5.1 表列出的待登记错误码；契约 v0.2 登记前按提案名使用并注明，不得长期以「契约未覆盖」作为错误码。
+> 身份字段（`createdBy`）取自 JWT `subject`，不接受请求体传入；跨模块 DTO 见本文件 6.5 节，本节不重复定义。
+
+---
+
+#### 6.2.1 POST /api/v1/questions — 新建题目（含评分点）
+
+**请求**
+
+| 字段 | 类型 | 必填 | 约束与依据 |
+| --- | --- | --- | --- |
+| `type` | enum | 是 | `SHORT_ANSWER` / `ESSAY`，仅此两种（contract 2.1） |
+| `stem` | text | 是 | 题干（contract 2.1） |
+| `referenceAnswer` | text | 是 | 参考答案与要点，供 AI 评分参考，必填（contract 2.1） |
+| `totalScore` | int | 是 | 题目分值（contract 2.1） |
+| `rubric` | `RubricItem[]` | 是 | 至少 1 项；`score` 之和必须等于 `totalScore`（contract 2.1 / R1） |
+
+`rubric[]` 元素（contract 2.2）：
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `description` | text | 是 | 可独立判定的得分要点，禁止「以及 / 等等 / 酌情 / 其他合理」 |
+| `score` | int | 是 | 该点分值，`≥ 0` |
+| `order` | int | 是 | 展示顺序，从 1 开始 |
+
+> `id`、`questionId` 由服务端生成，请求体不传。
+
+身份来源：JWT `role=TEACHER`；`createdBy` 取自 JWT `subject`。
+
+**成功 201：`Question`**（字段见 contract 2.1）
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 题目唯一标识 |
+| `type` | enum | `SHORT_ANSWER` / `ESSAY` |
+| `stem` | text | 题干 |
+| `referenceAnswer` | text | 参考答案与要点 |
+| `rubric` | `RubricItem[]` | 含 `id`、`questionId`、`description`、`score`、`order` |
+| `totalScore` | int | 等于各评分点分值之和 |
+| `status` | enum | 创建后为 `DRAFT`，可流转 `ACTIVE` / `ARCHIVED`（contract 2.1、AC-1） |
+| `createdBy` | string | 取自 JWT `subject` |
+| `createdAt` / `updatedAt` | datetime | 服务端时间 |
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 400 | `VALIDATION_ERROR`（待登记） | 缺少必填字段；`rubric` 为空数组；`score` 为负；`type` 不属于 `SHORT_ANSWER` / `ESSAY` | 原表 400；contract 2.1 / 2.2 |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | JWT 角色不是教师 | contract 第 5 节 |
+| 409 | `RUBRIC_SCORE_MISMATCH` | 评分点 `score` 之和 ≠ `totalScore` | contract 第 5 节 / AC-3 |
+| 409 | `RUBRIC_DESCRIPTION_VAGUE` | 任一评分点描述含「以及 / 等等 / 酌情 / 其他合理」 | contract 第 5 节 / AC-2 |
+
+**权限**：仅教师（`role=TEACHER`）；`createdBy` 取自 JWT，不接受请求体伪造。
+
+**对应 AC**：`module-01-qbank.md` AC-1 / AC-2 / AC-3
+
+---
+
+#### 6.2.2 PUT /api/v1/questions/{id} — 修改题目
+
+**请求**
+
+- 路径参数：`id` = `Question.id`
+- 请求体：字段同 6.2.1，按需传递需修改的字段
+- 修改 `totalScore` 时必须整体重传 `rubric`，重新执行「分值之和」与「禁用词」两项校验（contract 2.2 锁定规则 1）
+
+身份来源：JWT `role=TEACHER`。
+
+**成功 200：`Question`**（结构同 6.2.1，`updatedAt` 刷新）
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 400 | `VALIDATION_ERROR`（待登记） | 修改后字段类型或取值非法 | 原表 400 |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是教师；或该题 `createdBy` ≠ 当前 JWT `subject`（教师仅能操作本人创建的资源） | contract 第 5、6 节 |
+| 404 | `QUESTION_NOT_FOUND` | `id` 不存在 | contract 第 5 节 |
+| 409 | `RUBRIC_SCORE_MISMATCH` | 修改后评分点分值之和 ≠ `totalScore` | contract 第 5 节 |
+| 409 | `RUBRIC_DESCRIPTION_VAGUE` | 修改后评分点描述含禁用词 | contract 第 5 节 |
+| 409 | `QUESTION_ALREADY_USED`（待登记） | 该题已被 `PUBLISHED` 试卷引用，禁止修改以保护历史一致性 | ADR-001 锁题规则 |
+
+**权限**：仅教师，且仅题目创建者本人；已被 `PUBLISHED` 试卷引用的题目禁止修改。
+
+**对应 AC**：`module-01-qbank.md` AC-1（状态流转）；AC-2 / AC-3（修改后重新校验）
+
+---
+
+#### 6.2.3 GET /api/v1/questions — 查询题目列表（建卷选题）
+
+**请求**
+
+| 参数 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| `status` | query | enum | 否 | 默认 `ACTIVE`（组卷只选 `ACTIVE`）；可选 `DRAFT` / `ACTIVE` / `ARCHIVED` / `ALL` |
+
+身份来源：JWT；仅返回 `createdBy` = 当前 `subject` 的题目（contract 第 6 节：教师仅本人创建）。
+
+**成功 200：`Question[]`**（字段见 contract 2.1）
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 400 | `VALIDATION_ERROR`（待登记） | `status` 取值不在允许范围 | 原表未列，参数校验归 API 层 |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是教师 | contract 第 5 节 |
+
+**权限**：仅教师；仅本人创建的题目。
+
+**对应 AC**：`module-01-qbank.md` AC-4 的前置能力（组卷选题）
+
+---
+
+#### 6.2.4 POST /api/v1/papers — 组卷并保存 `DRAFT`
+
+**请求**
+
+| 字段 | 类型 | 必填 | 约束与依据 |
+| --- | --- | --- | --- |
+| `title` | string | 是 | 试卷名称（contract 2.3） |
+| `questionIds` | string[] | 是 | 至少 1 项；不得重复；每题必须存在且状态为 `ACTIVE`（FR-4）；**数组顺序即 `PaperItem.order`** |
+
+关键约定（contract 2.3 锁定规则 / FR-4）：
+
+1. **不接收** `totalScore`：由系统按各题 `Question.totalScore` 汇总，不接受手工填写。
+2. **不接收** 单题 `score`：`PaperItem.score` 必须等于题目 `totalScore`，组卷时不可改写。
+3. 保存结果固定为 `DRAFT`，**不写入** `startAt` / `endAt` / `publishedAt`（contract 2.3：发布时必填，由 `exam` 设置）。
+4. 组卷时按 ADR-001 在同一事务内写入**基线快照**（题干、参考答案、总分、评分点），供草稿阶段对比；发布时由 `exam` 只改 `Paper.status`，基线快照随 `PUBLISHED` 成为**正式快照**并冻结，`exam` 不调用 qbank 写接口。
+5. 草稿快照对比见 6.2.7；具体快照行为待 ADR-001 评审通过后生效。
+
+**成功 201：`Paper`**（字段见 contract 2.3）
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 试卷唯一标识 |
+| `title` | string | 试卷名称 |
+| `items` | `PaperItem[]` | `{ questionId, order, score }`，`order` 从 1 开始，`score` 等于题目 `totalScore` |
+| `totalScore` | int | 等于各题 `Question.totalScore` 之和 |
+| `status` | enum | 固定 `DRAFT` |
+| `startAt` / `endAt` / `publishedAt` | datetime | `DRAFT` 状态下为空 |
+| `createdBy` | string | 取自 JWT `subject` |
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 400 | `VALIDATION_ERROR`（待登记） | `title` 为空；`questionIds` 为空数组；`questionIds` 中存在重复题目 | 原表 400 |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是教师 | contract 第 5 节 |
+| 404 | `QUESTION_NOT_FOUND` | `questionIds` 中任一题目不存在 | contract 第 5 节 |
+| 409 | `PAPER_SCORE_MISMATCH` | 系统汇总的总分与各题分值之和不一致（防御性校验，正常路径不应触发） | contract 第 5 节（该码产生模块标注为 exam） |
+| 409 | `QUESTION_NOT_ACTIVE`（待登记） | `questionIds` 中任一题目状态 ≠ `ACTIVE` | FR-4；module-01 §6 |
+
+**权限**：仅教师；组卷后试卷归属该教师（`createdBy`）。
+
+**对应 AC**：`module-01-qbank.md` AC-4
+
+---
+
+#### 6.2.5 GET /api/v1/papers/{id} — 试卷详情
+
+**请求**
+
+- 路径参数：`id` = `Paper.id`
+- 身份来源：JWT
+
+**成功 200：`Paper`**（字段见 contract 2.3）
+
+- `DRAFT` 试卷：返回 contract 2.3 全部字段，另含各题基线快照的 `stem`、`referenceAnswer`、`rubric`，供教师核对后交 `exam` 发布；
+- `PUBLISHED` / `CLOSED` 试卷：只返回冻结的正式快照，不回源读取最新题目；
+- 草稿阶段若要查看“组卷时的题目 vs 当前题目”，使用 6.2.7 的 diff 接口。
+- 快照行为待 ADR-001 评审通过后生效；通过前按现行动态引用实现不得合并。
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是教师；或试卷 `createdBy` ≠ 当前 JWT `subject` | contract 第 5、6 节 |
+| 404 | `PAPER_NOT_FOUND`（待登记） | 试卷不存在 | 原表 404；契约 v0.2 登记 |
+
+**权限**：仅教师；仅本人创建的试卷。已发布试卷面向学生的可见性由 `exam` 控制，qbank 不实现该逻辑。
+
+**对应 AC**：`module-01-qbank.md` AC-4（交接前核对）、FR-5
+
+---
+
+#### 6.2.6 GET /api/v1/papers — 试卷列表（待发布）
+
+**请求**
+
+| 参数 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| `status` | query | enum | 否 | 默认 `DRAFT`；可选 `PUBLISHED` / `CLOSED` / `ALL` |
+
+身份来源：JWT；仅返回 `createdBy` = 当前 `subject` 的试卷。
+
+**成功 200：`Paper[]`**（字段见 contract 2.3）
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 400 | `VALIDATION_ERROR`（待登记） | `status` 取值不在允许范围 | 原表未列，参数校验归 API 层 |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是教师 | contract 第 5 节 |
+
+**权限**：仅教师；仅本人创建的试卷。
+
+**对应 AC**：`module-01-qbank.md` AC-4、FR-5（仅 `DRAFT` 试卷可交接给 `exam`）
+
+---
+
+#### 6.2.7 GET /api/v1/papers/{id}/snapshot-diff — 草稿快照对比（契约预留，UI 后置）
+
+**用途**：教师查看组卷时的基线快照与当前题目内容的差异。只读，不修改任何数据；前端对比页第 10 周实现。
+
+**请求**
+
+- 路径参数：`id` = `Paper.id`
+- 身份来源：JWT；仅教师本人试卷
+
+**成功 200：`SnapshotDiff[]`**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `questionId` | string | 题目 ID |
+| `changed` | boolean | 基线快照与当前题目是否不同 |
+| `currentStatus` | enum | `ACTIVE` / `ARCHIVED` / `MISSING` |
+| `baseline` | object | 基线快照：`type`、`stem`、`referenceAnswer`、`totalScore`、`rubric[]` |
+| `current` | object / null | 当前题目内容；`MISSING` 时为 `null` |
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是教师；或试卷 `createdBy` ≠ 当前 JWT `subject` | contract 第 5、6 节 |
+| 404 | `PAPER_NOT_FOUND`（待登记） | 试卷不存在 | 5.1 表；契约 v0.2 登记 |
+
+**权限**：仅教师本人试卷；不返回他人试卷内容。
+
+**对应 AC**：`module-01-qbank.md` AC-4（交接前核对）；ADR-001 草稿对比能力。
+
+> MVP1 只预留契约与数据结构，不做前端页面；不提供“刷新快照”写接口。教师确认要更新快照时，重新组卷。
+
+---
+
+#### 6.2.8 数据流与风险
+
+**成功路径**
+
+```
+教师登录（integration，JWT role=TEACHER）
+  → POST /questions：参数校验 → 禁用词检查 → 评分点分值之和 = totalScore
+      → 同一事务写入题目与评分点（referenceAnswer 必填；rubric 至少 1 项；status 默认 DRAFT）
+  → 题目流转为 ACTIVE
+  → GET /questions?status=ACTIVE：按 JWT subject 过滤，返回本人 ACTIVE 题
+  → POST /papers：存在性 + ACTIVE + 去重校验 → 系统汇总 totalScore
+      → 按 ADR-001 在同一事务内写入基线快照 → 提交
+  → 返回 201 Paper（status=DRAFT，startAt/endAt/publishedAt 为空）
+  → 草稿阶段：GET /papers/{id}/snapshot-diff 对比基线快照与当前题目（只读，UI 后置）
+  → 交接：exam 发布时只把 Paper 改为 PUBLISHED，基线快照随状态成为正式快照；
+    exam 按本文件 6.5 节 `PaperForExam` 读取，grading 按 `QuestionForGrading` 读取。
+    qbank 不实现发布、计时、作答与阅卷。
+```
+
+**失败路径**（均不产生副作用：不新增记录、不改状态）
+
+| 失败场景 | 返回 | 保证不变 |
+| --- | --- | --- |
+| 评分点描述含「以及 / 等等 / 酌情 / 其他合理」 | 409 `RUBRIC_DESCRIPTION_VAGUE` | 不写题目与评分点 |
+| 评分点分值之和 ≠ 题目总分 | 409 `RUBRIC_SCORE_MISMATCH` | 不写题目与评分点 |
+| 组卷引用非 `ACTIVE` 题目 | 409 `QUESTION_NOT_ACTIVE`（待登记） | 不写试卷与试卷题目 |
+| 组卷 `questionIds` 重复 | 400 `VALIDATION_ERROR`（待登记） | 不写试卷与试卷题目 |
+| 修改已被 `PUBLISHED` 试卷引用的题目 | 409 `QUESTION_ALREADY_USED`（待登记） | 原题目与历史快照均不变 |
+| 组卷事务中途异常 | 事务回滚 | 试卷与试卷题目均无残留 |
+
+**风险 R-01：组卷快照写入的事务原子性**
+
+| 项 | 内容 |
+| --- | --- |
+| 风险 | 组卷事务在写入 N 道题快照的过程中异常退出，可能遗留不完整的试卷题目记录，导致 `exam` 拿到缺题试卷 |
+| 影响 | `exam` 发布时会命中 `EMPTY_PAPER` 或 `PAPER_SCORE_MISMATCH`，错误信息对教师不直观，脏数据难以排查 |
+| 应对 | ① 试卷与试卷题目写入置于同一事务；② 试卷题目按 `(paperId, questionId)` 唯一，防重复；③ 提交前校验试卷题目行数 == `questionIds` 长度，不等则主动抛异常回滚 |
+| 验证 | 仍并入 SP-04，但 SP-04 当前只完成存储验证，**事务回滚尚未测试**；需在 MySQL 8 重跑时补测试，或第 9 周集成测试补。未补前 R-01 标“待验证”，不得算已关闭。 |
+
+---
+
+> **待契约 v0.2 登记的错误码（4 个）**：`VALIDATION_ERROR`（400）、`PAPER_NOT_FOUND`（404）、`QUESTION_NOT_ACTIVE`（409）、`QUESTION_ALREADY_USED`（409）。
+> 登记前这些码只在本文作为提案，不得在代码中先使用；接口按对应 HTTP 状态返回，`code` 字段暂用提案名并在 PR 中注明。
 
 ### 6.3 在线考试与答卷（exam）
 
@@ -198,8 +497,8 @@ qbank  ◄──── exam  ◄──── grading
 
 | 方向 | 数据契约（逻辑字段） | 约束 |
 | --- | --- | --- |
-| qbank → exam | `PaperForExam { paperId, title, totalScore, items[{questionId, order, score, type, stem}], status }` | 不包含参考答案与评分点；`exam` 发布时重新校验分值 |
-| qbank → grading | `QuestionForGrading { questionId, type, stem, referenceAnswer, totalScore, rubric[{rubricItemId, description, score, order}] }` | 只读；题目版本取值待 ADR-001（C-01） |
+| qbank → exam | `PaperForExam { paperId, title, totalScore, items[{questionId, order, score, type, stem}], status }` | 不包含参考答案与评分点；`exam` 发布时重新校验分值；qbank 侧由 `paper_items` 快照组装，`DRAFT` 用基线快照，`PUBLISHED` / `CLOSED` 用冻结的正式快照（待 ADR-001 通过） |
+| qbank → grading | `QuestionForGrading { questionId, type, stem, referenceAnswer, totalScore, rubric[{rubricItemId, description, score, order}] }` | 只读；qbank 侧从快照组装；同一题在不同试卷可能是不同快照，按 `paperId` 定位（待 ADR-001 通过） |
 | exam → grading | `SubmittedSheetForGrading { answerSheetId, paperId, studentId, submittedAt, submitType, answers[{questionId, content}] }` | 仅 `SUBMITTED`；只读，不改变答案与时间 |
 | grading → 学生端 | `PublishedGrade { paperId, totalScore, items[{questionId, reviewedScore, reviewComment}] }` | 仅成绩发布后；不返回 `aiScore` / `aiReason` / `rubricHits` |
 | grading → 教师端 | `GradingSheetView { answerSheetId, items[{questionId, aiStatus, rubricHits, aiScore, aiReason, reviewedScore, reviewComment, reviewedAt}] }` | 仅试卷创建教师可见 |
@@ -272,7 +571,7 @@ qbank  ◄──── exam  ◄──── grading
 
 | ADR | 主题 | 对应未决项 | 主笔 | 状态 |
 | --- | --- | --- | --- | --- |
-| ADR-001 | 已发布试卷取题目快照还是引用 | C-01 | 孙宇萱（qbank） | 待提交 |
+| ADR-001 | 已发布试卷取题目快照还是引用（基线快照 + 发布冻结） | C-01 | 孙宇萱（qbank） | 提议（待评审） |
 | ADR-002 | 交卷并发与自动交卷幂等 | C-03 | 钱斓轩（exam） | 待提交 |
 | ADR-003 | AI 初评调用、超时重试与幂等 | C-06 | 李昕彤 + grading | 本 PR 提交（提议） |
 
