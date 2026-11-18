@@ -495,7 +495,7 @@ qbank  ◄──── exam  ◄──── grading
 
 - 路径 ID 均为非空字符串。以下接口无查询参数，除复核外无请求体。身份和角色只取自 JWT，不接受客户端传入 studentId、createdBy 或 reviewedBy。
 - 所有接口：JWT 缺失、无效或过期返回 401 UNAUTHORIZED；角色不符或资源不归属本人返回 403 FORBIDDEN；路径参数或请求体格式非法返回 400 VALIDATION_ERROR。错误体为 { code: string, message: string }。
-- 以下是第 9 周拆任务用的接口草案。新增错误码及标注待决的行为由集成负责人确认后冻结。时间字段为带偏移量的 ISO 8601 字符串；以下 nullable 字段未产生时返回 null，空集合返回 []。
+- 以下是第 9 周拆任务用的接口草案，新增错误码和审计字段见 [契约 v0.2 草案](https://github.com/AI-exam-team/ai-exam-system/blob/docs/issue-33-grading-contract/spec/contract-v0.2.md)。待契约评审及标注的未决行为确认后冻结。时间字段为带偏移量的 ISO 8601 字符串；以下 nullable 字段未产生时返回 null，空集合返回 []。
 
 | 类型 | 字段及类型 |
 | --- | --- |
@@ -517,7 +517,7 @@ qbank  ◄──── exam  ◄──── grading
 
 - 请求：id 为答卷 ID，questionId 为该答卷所属试卷中的题目 ID。
 - 成功 200：GradeResult，校验成功后返回，已有 SUCCEEDED 则复用。按单题幂等，整卷操作入口仍待 G-08。
-- 失败：404 ANSWER_SHEET_NOT_FOUND（答卷不存在）；404 QUESTION_NOT_FOUND（题目不属于对应试卷）；409 ANSWER_NOT_SUBMITTED（答卷为 DRAFT）；409 AI_GRADING_IN_PROGRESS（该题处于 PENDING）；502 AI_SERVICE_TIMEOUT（模型超时）；502 AI_OUTPUT_INVALID（JSON 无法解析，字段、评分点 ID 或评分规则校验失败）；502 AI_SCORE_OUT_OF_RANGE（AI 分数超过合法范围，错误优先级待 G-03）。重试耗尽后的再次触发、非超时上游故障、迟到响应的 HTTP 映射待 ADR-003 / G-03。
+- 失败：404 ANSWER_SHEET_NOT_FOUND（答卷不存在）；404 QUESTION_NOT_FOUND（题目不属于对应试卷）；409 ANSWER_NOT_SUBMITTED（答卷为 DRAFT）；409 AI_GRADING_IN_PROGRESS（该题处于 PENDING）；409 AI_ATTEMPT_LIMIT_REACHED（实际模型调用额度耗尽且无成功结果可复用）；409 AI_RESULT_DISCARDED（响应到达时已复核或尝试号失效）；502 AI_SERVICE_TIMEOUT（最终失败原因为模型超时）；502 AI_SERVICE_UNAVAILABLE（最终失败原因为非超时上游故障，如限流、连接异常或上游非成功响应）；502 AI_OUTPUT_INVALID（结构、评分点映射或评分一致性失败）；502 AI_SCORE_OUT_OF_RANGE（结构可校验但分数越界，优先于评分一致性检查）。新增映射待契约 v0.2 评审。
 - 权限：教师，通过答卷的 paperId 校验 Paper.createdBy 等于 JWT subject，再校验题目归属。模型失败后允许人工复核。
 - 对应 [module-03](../spec/module-03-grading.md) AC-1～AC-6 / AC-12～AC-14。
 
@@ -552,7 +552,7 @@ qbank  ◄──── exam  ◄──── grading
 | 方向 | 数据契约（逻辑字段） | 约束 |
 | --- | --- | --- |
 | qbank → exam | `PaperForExam { paperId, title, totalScore, items[{questionId, order, score, type, stem}], status }` | 不包含参考答案与评分点；`exam` 发布时重新校验分值；qbank 侧由 `paper_items` 快照组装，`DRAFT` 用基线快照，`PUBLISHED` / `CLOSED` 用冻结的正式快照（待 ADR-001 通过） |
-| qbank → grading | `QuestionForGrading { questionId, type, stem, referenceAnswer, totalScore, rubric[{rubricItemId, description, score, order}] }` | 只读；qbank 侧从快照组装；同一题在不同试卷可能是不同快照，按 `paperId` 定位（待 ADR-001 通过） |
+| qbank → grading | `QuestionForGrading { paperId, questionId, type, stem, referenceAnswer, totalScore, rubric[{rubricItemId, description, score, order}] }` | 只读；使用答卷所属的 `paperId` 与 `questionId` 作为组合键定位试卷快照，禁止回退按题目 ID 读取其他试卷的快照或当前题库内容（待 ADR-001 通过） |
 | exam → grading | `SubmittedSheetForGrading { answerSheetId, paperId, studentId, submittedAt, submitType, answers[{questionId, content}] }` | 仅 `SUBMITTED`；只读，不改变答案与时间 |
 | grading → 学生端 | `PublishedGrade { paperId, totalScore, items[{questionId, reviewedScore, reviewComment}] }` | 仅成绩发布后；不返回 `aiScore` / `aiReason` / `rubricHits` |
 | grading → 教师端 | `GradingSheetView { answerSheetId, items[{questionId, aiStatus, rubricHits, aiScore, aiReason, reviewedScore, reviewComment, reviewedAt}] }` | 仅试卷创建教师可见 |
@@ -593,7 +593,7 @@ qbank  ◄──── exam  ◄──── grading
 
 **核心不变式**：
 
-1. 失败请求不产生副作用：不新增记录、不改变状态、不提前写 `finalScore`。
+1. 鉴权、归属、输入或业务前置条件校验失败，不启动模型调用、不写业务状态。已受理的模型调用失败应记录该次尝试、错误码和审计信息，最终失败将当前尝试置为 `FAILED`，不采纳非法建议分、不覆盖教师确认分、不提前写 `finalScore`。迟到响应受尝试号保护。
 2. 交卷幂等：同一学生同一试卷最多一份答卷，只允许一次 `DRAFT → SUBMITTED`。
 3. AI 与教师分离：`aiScore` 只是建议，`reviewedScore` 是正式分；复核不得覆盖 `aiScore`。
 4. 零分 ≠ 未复核：`reviewedScore = 0` 是有效确认；缺失记录或 null 才表示未复核。
