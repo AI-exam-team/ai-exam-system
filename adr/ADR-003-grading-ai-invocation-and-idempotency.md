@@ -9,7 +9,7 @@
 | 决策者 | 李昕彤（集成与契约）、grading 组 |
 | 评审人 | 左恩东（grading 主笔）、王麒博（grading） |
 | 关联需求 | `spec/contract-v0.1.md` C-06、R6；`spec/mvp1-scope.md` TBD-04；`spec/module-03-grading.md` FR-4/FR-8、NFR-4；`agent-rules.md` AR-6.7 |
-| 关联 Issue | 待关联（第 8 周 ADR 任务） |
+| 关联 Issue | [#33](https://github.com/AI-exam-team/ai-exam-system/issues/33) |
 
 ## 背景
 
@@ -37,7 +37,7 @@ AI 初评是整条链路唯一依赖外部模型、耗时与费用都不可控�
    - 超时返回 502 `AI_SERVICE_TIMEOUT`，该题置 `FAILED`，保留人工复核通道。
 
 3. **有限重试**
-   - 自动重试仅限网络抖动类可重试异常，最多 **1 次**；总尝试次数（含人工再次触发）上限 **3 次**，超过后只允许人工评分，不无限重试。
+   - 每个 `(answerSheetId, questionId)` 最多发起 **3 次实际模型调用**。首次调用、自动重试、教师再次触发后发起的调用均计数。每次请求最多自动重试 1 次且仅限可重试网络异常，发起前原子占用剩余额度。复用成功结果、请求校验失败及 PENDING 拒绝均不计数。耗尽后继续开放人工复核。
    - 成功结果永久复用，不重复调用；失败不等于 0 分。
 
 4. **输出校验（整题原子）**
@@ -92,5 +92,5 @@ AI 初评是整条链路唯一依赖外部模型、耗时与费用都不可控�
 ## 关联需求 / Issue
 
 - 需求：`spec/contract-v0.1.md` 第 8 节 C-06、第 7 节 R6；`spec/mvp1-scope.md` TBD-04；`spec/module-03-grading.md` FR-4、FR-8、NFR-4
-- Issue：#待关联
+- Issue：[#33](https://github.com/AI-exam-team/ai-exam-system/issues/33)
 - 相关 ADR：ADR-001（题目版本，影响评分点取值）、ADR-002（交卷幂等，影响可评分对象）

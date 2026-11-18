@@ -483,13 +483,67 @@ qbank  ◄──── exam  ◄──── grading
 
 | 方法 | 路径 | 说明 | 成功 | 主要失败 |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/papers/{id}/grading-sheets` | 教师查看逐题评分状态 | 200 `GradingSheetView` | 403（非本人试卷）、404 |
+| GET | `/api/v1/papers/{id}/grading-sheets` | 教师查看逐题评分状态 | 200 `GradingSheetView[]` | 403（非本人试卷）、404 |
 | POST | `/api/v1/answer-sheets/{id}/questions/{questionId}/ai-grade` | 触发单题初评（整卷批量=循环调用） | 200 `GradeResult` | 409 `ANSWER_NOT_SUBMITTED` / `AI_GRADING_IN_PROGRESS`、502 `AI_SERVICE_TIMEOUT` / `AI_OUTPUT_INVALID` / `AI_SCORE_OUT_OF_RANGE` |
 | PUT | `/api/v1/answer-sheets/{id}/questions/{questionId}/review` | 教师复核并写确认分 | 200 `GradeResult` | 400 `INVALID_REVIEWED_SCORE`、403、404 |
 | POST | `/api/v1/papers/{id}/grades/publish` | 整场发布成绩 | 200 `{ publishedAt }` | 409 `GRADE_NOT_FULLY_REVIEWED`、403 |
 | GET | `/api/v1/my/grades/{paperId}` | 学生查本人成绩 | 200 `PublishedGrade` | 403 `SCORE_NOT_PUBLISHED`、404 |
 
 > 触发粒度（逐题 vs 整卷）待 G-08 决议；本表按单题幂等键设计，整卷批量不引入新的幂等语义。
+
+#### 6.4.1 通用请求与响应约定
+
+- 路径 ID 均为非空字符串。以下接口无查询参数，除复核外无请求体。身份和角色只取自 JWT，不接受客户端传入 studentId、createdBy 或 reviewedBy。
+- 所有接口：JWT 缺失、无效或过期返回 401 UNAUTHORIZED；角色不符或资源不归属本人返回 403 FORBIDDEN；路径参数或请求体格式非法返回 400 VALIDATION_ERROR。错误体至少包含 { code: string, message: string }，并可包含统一响应约定中的 requestId。
+- 以下是第 9 周拆任务用的接口草案，新增错误码和审计字段见 [契约 v0.2 草案](https://github.com/AI-exam-team/ai-exam-system/blob/docs/issue-33-grading-contract/spec/contract-v0.2.md)。待契约评审及标注的未决行为确认后冻结。时间字段为带偏移量的 ISO 8601 字符串；以下 nullable 字段未产生时返回 null，空集合返回 []。
+
+| 类型 | 字段及类型 |
+| --- | --- |
+| RubricHit | rubricItemId: string, hit: boolean, score: integer, reason: string |
+| GradingItem | questionId: string, aiStatus: NOT_STARTED / PENDING / SUCCEEDED / FAILED, rubricHits: RubricHit[]（未成功为 []）, aiScore: integer nullable, aiReason: string nullable, reviewedScore: integer nullable, reviewComment: string nullable, reviewedAt: datetime nullable |
+| GradeResult | GradingItem 全部字段，加 id: string, answerSheetId: string, reviewedBy: string nullable |
+| GradingSheetView | answerSheetId: string, items: GradingItem[] |
+| PublishedGrade | paperId: string, totalScore: integer（教师确认分之和）, items: { questionId: string, reviewedScore: integer, reviewComment: string nullable }[] |
+
+#### 6.4.2 GET /api/v1/papers/{id}/grading-sheets
+
+- 请求：id 为试卷 ID。
+- 成功 200：GradingSheetView[]，每份 SUBMITTED 答卷一项，每道试卷题目一条，无评分记录显示 NOT_STARTED。此处明确总览表中的响应为列表，待接口评审确认。
+- 失败：404 PAPER_NOT_FOUND（试卷不存在）。无已提交答卷返回空数组。
+- 权限：教师，校验 Paper.createdBy 等于 JWT subject。
+- 对应 [module-03](../spec/module-03-grading.md) AC-1 / AC-12 / AC-14。
+
+#### 6.4.3 POST /api/v1/answer-sheets/{id}/questions/{questionId}/ai-grade
+
+- 请求：id 为答卷 ID，questionId 为该答卷所属试卷中的题目 ID。
+- 成功 200：GradeResult，校验成功后返回，已有 SUCCEEDED 则复用。按单题幂等，整卷操作入口仍待 G-08。
+- 失败：404 ANSWER_SHEET_NOT_FOUND（答卷不存在）；404 QUESTION_NOT_FOUND（题目不属于对应试卷）；409 ANSWER_NOT_SUBMITTED（答卷为 DRAFT）；409 AI_GRADING_IN_PROGRESS（该题处于 PENDING）；409 AI_ATTEMPT_LIMIT_REACHED（实际模型调用额度耗尽且无成功结果可复用）；409 AI_RESULT_DISCARDED（响应到达时已复核或尝试号失效）；502 AI_SERVICE_TIMEOUT（最终失败原因为模型超时）；502 AI_SERVICE_UNAVAILABLE（最终失败原因为非超时上游故障，如限流、连接异常或上游非成功响应）；502 AI_OUTPUT_INVALID（结构、评分点映射或评分一致性失败）；502 AI_SCORE_OUT_OF_RANGE（结构可校验但分数越界，优先于评分一致性检查）。新增映射待契约 v0.2 评审。
+- 权限：教师，通过答卷的 paperId 校验 Paper.createdBy 等于 JWT subject，再校验题目归属。模型失败后允许人工复核。
+- 对应 [module-03](../spec/module-03-grading.md) AC-1～AC-6 / AC-12～AC-14。
+
+#### 6.4.4 PUT /api/v1/answer-sheets/{id}/questions/{questionId}/review
+
+- 请求：路径参数同 6.4.3。请求体 { reviewedScore: integer（必填）, reviewComment?: string }。
+- 成功 200：GradeResult，包含确认分、JWT 对应教师 ID 和服务端复核时间，保留已有 AI 结果。
+- 失败：400 INVALID_REVIEWED_SCORE（确认分缺失、非整数或超出 [0, 题目分值]）；404 ANSWER_SHEET_NOT_FOUND（答卷不存在）；404 QUESTION_NOT_FOUND（题目不属于对应试卷）；409 ANSWER_NOT_SUBMITTED（草稿答卷，复用码待确认）。发布后能否改分待 G-02，未初评或初评中能否人工确认待 G-04。
+- 权限：教师，通过答卷所属试卷校验 Paper.createdBy 等于 JWT subject，并校验题目归属。
+- 对应 [module-03](../spec/module-03-grading.md) AC-6～AC-8 / AC-12～AC-14。
+
+#### 6.4.5 POST /api/v1/papers/{id}/grades/publish
+
+- 请求：id 为试卷 ID。
+- 成功 200：{ publishedAt: datetime }，整场原子发布，按确认分汇总。重复请求不得改变成绩，原发布时间的返回规则待 G-02。
+- 失败：404 PAPER_NOT_FOUND（试卷不存在）；409 GRADE_NOT_FULLY_REVIEWED（任一已提交答卷存在未确认题目，0 分为有效确认）。是否必须等考试结束及无答卷时的行为待 G-01。
+- 权限：教师，校验 Paper.createdBy 等于 JWT subject。
+- 对应 [module-03](../spec/module-03-grading.md) AC-9 / AC-10 / AC-12 / AC-13。
+
+#### 6.4.6 GET /api/v1/my/grades/{paperId}
+
+- 请求：paperId 为试卷 ID。
+- 成功 200：PublishedGrade，仅返回本人确认分、教师意见和总分。
+- 失败：404 ANSWER_SHEET_NOT_FOUND（按 JWT 身份和 paperId 查无本人已提交答卷）；403 SCORE_NOT_PUBLISHED（有本人已提交答卷但整场成绩未发布）。不得根据其他学生是否交卷改变响应。
+- 权限：学生，按 (paperId, JWT subject) 查本人答卷。
+- 对应 [module-03](../spec/module-03-grading.md) AC-10 / AC-11 / AC-12。
 
 ### 6.5 跨模块交接数据
 
@@ -498,7 +552,7 @@ qbank  ◄──── exam  ◄──── grading
 | 方向 | 数据契约（逻辑字段） | 约束 |
 | --- | --- | --- |
 | qbank → exam | `PaperForExam { paperId, title, totalScore, items[{questionId, order, score, type, stem}], status }` | 不包含参考答案与评分点；`exam` 发布时重新校验分值；qbank 侧由 `paper_items` 快照组装，`DRAFT` 用基线快照，`PUBLISHED` / `CLOSED` 用冻结的正式快照（待 ADR-001 通过） |
-| qbank → grading | `QuestionForGrading { questionId, type, stem, referenceAnswer, totalScore, rubric[{rubricItemId, description, score, order}] }` | 只读；qbank 侧从快照组装；同一题在不同试卷可能是不同快照，按 `paperId` 定位（待 ADR-001 通过） |
+| qbank → grading | `QuestionForGrading { paperId, questionId, type, stem, referenceAnswer, totalScore, rubric[{rubricItemId, description, score, order}] }` | 只读；使用答卷所属的 `paperId` 与 `questionId` 作为组合键定位试卷快照，禁止回退按题目 ID 读取其他试卷的快照或当前题库内容（待 ADR-001 通过） |
 | exam → grading | `SubmittedSheetForGrading { answerSheetId, paperId, studentId, submittedAt, submitType, answers[{questionId, content}] }` | 仅 `SUBMITTED`；只读，不改变答案与时间 |
 | grading → 学生端 | `PublishedGrade { paperId, totalScore, items[{questionId, reviewedScore, reviewComment}] }` | 仅成绩发布后；不返回 `aiScore` / `aiReason` / `rubricHits` |
 | grading → 教师端 | `GradingSheetView { answerSheetId, items[{questionId, aiStatus, rubricHits, aiScore, aiReason, reviewedScore, reviewComment, reviewedAt}] }` | 仅试卷创建教师可见 |
@@ -539,7 +593,7 @@ qbank  ◄──── exam  ◄──── grading
 
 **核心不变式**：
 
-1. 失败请求不产生副作用：不新增记录、不改变状态、不提前写 `finalScore`。
+1. 鉴权、归属、输入或业务前置条件校验失败，不启动模型调用、不写业务状态。已受理的模型调用失败应记录该次尝试、错误码和审计信息，最终失败将当前尝试置为 `FAILED`，不采纳非法建议分、不覆盖教师确认分、不提前写 `finalScore`。迟到响应受尝试号保护。
 2. 交卷幂等：同一学生同一试卷最多一份答卷，只允许一次 `DRAFT → SUBMITTED`。
 3. AI 与教师分离：`aiScore` 只是建议，`reviewedScore` 是正式分；复核不得覆盖 `aiScore`。
 4. 零分 ≠ 未复核：`reviewedScore = 0` 是有效确认；缺失记录或 null 才表示未复核。
