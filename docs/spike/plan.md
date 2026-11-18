@@ -18,7 +18,7 @@
 
 | 编号 | 主题 | 负责人 | 时间盒 | 目录 | 结论去向 |
 | --- | --- | --- | --- | --- | --- |
-| SP-01 | DeepSeek 结构化评分输出、延迟与费用 | 主执行 左恩东 / 复核 王麒博 | 1 天 | `docs/spike/spike-deepseek-grading/` | ADR-003、grading 接口设计 |
+| SP-01 | DeepSeek 结构化评分输出、延迟与费用 | 左恩东（主执行） / 王麒博（复核） | 1 天 | `docs/spike/spike-deepseek-grading/` | ADR-003、grading 接口设计 |
 | SP-02 | MySQL 并发交卷幂等 | 主执行 钱斓轩 / 复核 李昕彤 | 0.5 天 | `docs/spike/spike-mysql-submit-idempotency/` | ADR-002、exam 测试用例 |
 | SP-03 | 自动交卷触发方式与调度漂移 | 主执行 钱斓轩 / 复核 李昕彤 | 0.5 天 | `docs/spike/spike-auto-submit-trigger/` | ADR-002、exam 实现方案 |
 | SP-04 | 长文本答案与 utf8mb4 存储 | 主执行 周裔 / 复核 孙宇萱 | 0.5 天 | `docs/spike/spike-mysql-text-storage/` | qbank/exam 字段设计 |
@@ -30,6 +30,8 @@
 ---
 
 ## 2. SP-01 DeepSeek 结构化评分输出、延迟与费用
+
+认领记录：左恩东主执行，王麒博复核，2026-11-18，[Issue #33](https://github.com/AI-exam-team/ai-exam-system/issues/33)。
 
 **验证问题**
 
