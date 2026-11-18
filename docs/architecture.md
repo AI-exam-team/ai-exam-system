@@ -485,6 +485,8 @@ qbank  ◄──── exam  ◄──── grading
 
 #### 6.3.1 POST /api/v1/papers/{id}/publish — 发布考试
 
+> **实现状态：阻塞（Q-1 / ADR-004）**——发布写路径未裁决前，本节只作为契约提案，不写实现。
+
 **请求**
 
 - 路径参数：`id` = `Paper.id`
@@ -768,6 +770,8 @@ qbank  ◄──── exam  ◄──── grading
 **对应 AC**：AC-9（越权与不存在）；contract 第 6 节。module-02 无独立 AC，本接口作为教师复核入口的前置能力，跨模块消费见 6.5 `SubmittedSheetForGrading`。
 
 #### 6.3.8 自动交卷触发方式（ADR-002 决策摘要）
+
+> **实现状态：阻塞（Q-1 / Q-7 / Q-8）**——qbank `markClosed` / `findDuePapers` 与 `PaperForExam` 字段到位前，本节只作为契约描述。
 
 > 完整取舍、并发 SQL 与失败语义见 `adr/ADR-002-exam-submit-idempotency.md`；本节只写 exam 接口可见的行为。
 
