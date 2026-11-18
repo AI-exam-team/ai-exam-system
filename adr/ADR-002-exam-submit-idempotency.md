@@ -179,7 +179,7 @@ SELECT id, paper_id
 ### 后续需要完成的事项
 
 - [ ] SP-02：执行 50 并发 × 10 轮实验，回填成功/冲突/行数/`submitted_at` 数据（钱斓轩）。
-- [ ] SP-03：执行三种触发方案对比，回填扫描间隔与漂移结论（李昕彤主、钱斓轩复核）。
+- [ ] SP-03：执行三种触发方案对比，回填扫描间隔与漂移结论（钱斓轩主、李昕彤复核）。
 - [ ] 契约 v0.2：登记 `VALIDATION_ERROR`；决定 `PAPER_NOT_DRAFT` 是否入表（集成负责人）。
 - [ ] Q-1：裁决 `Paper` 发布/关闭写路径；同步 `architecture.md` 6.3.1 / 6.3.8（李昕彤 + qbank）。
 - [ ] Q-2：G-01 若要求 `CLOSED` 后才能发布成绩，补 `ExamProgressForGrading` DTO（李昕彤 + 左恩东）。

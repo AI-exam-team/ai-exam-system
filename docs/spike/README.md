@@ -70,10 +70,10 @@ docs/spike/spike-<topic>/
 | --- | --- | --- | --- | --- | --- |
 | SP-01 | DeepSeek 结构化评分输出、延迟与费用 | `docs/spike/spike-deepseek-grading/` | 主执行 左恩东 / 复核 王麒博 | 计划中 | - |
 | SP-02 | MySQL 并发交卷幂等 | `docs/spike/spike-mysql-submit-idempotency/` | 主执行 钱斓轩 / 复核 李昕彤 | 进行中 | - |
-| SP-03 | 自动交卷触发方式与调度漂移 | `docs/spike/spike-auto-submit-trigger/` | 主执行 李昕彤 / 复核 钱斓轩 | 进行中 | - |
+| SP-03 | 自动交卷触发方式与调度漂移 | `docs/spike/spike-auto-submit-trigger/` | 主执行 钱斓轩 / 复核 李昕彤 | 进行中 | - |
 | SP-04 | 长文本答案与 utf8mb4 存储 | `docs/spike/spike-mysql-text-storage/` | 主执行 周裔 / 复核 孙宇萱 | 有条件可行（待 MySQL 8 重跑） | SQL Server 初步；MySQL 待验证 |
 
-> 认领日期：2026-11-18。SP-02 主执行 钱斓轩 / 复核 李昕彤；SP-03 主执行 李昕彤 / 复核 钱斓轩。同一探针目录只由主执行修改，复核人只看 diff 与证据。
+> 认领日期：2026-11-18。SP-02、SP-03 均为 主执行 钱斓轩 / 复核 李昕彤。同一探针目录只由主执行修改，复核人只看 diff 与证据。
 
 ## 七、已确认事项
 

@@ -20,7 +20,7 @@
 | --- | --- | --- | --- | --- | --- |
 | SP-01 | DeepSeek 结构化评分输出、延迟与费用 | 主执行 左恩东 / 复核 王麒博 | 1 天 | `docs/spike/spike-deepseek-grading/` | ADR-003、grading 接口设计 |
 | SP-02 | MySQL 并发交卷幂等 | 主执行 钱斓轩 / 复核 李昕彤 | 0.5 天 | `docs/spike/spike-mysql-submit-idempotency/` | ADR-002、exam 测试用例 |
-| SP-03 | 自动交卷触发方式与调度漂移 | 主执行 李昕彤 / 复核 钱斓轩 | 0.5 天 | `docs/spike/spike-auto-submit-trigger/` | ADR-002、exam 实现方案 |
+| SP-03 | 自动交卷触发方式与调度漂移 | 主执行 钱斓轩 / 复核 李昕彤 | 0.5 天 | `docs/spike/spike-auto-submit-trigger/` | ADR-002、exam 实现方案 |
 | SP-04 | 长文本答案与 utf8mb4 存储 | 主执行 周裔 / 复核 孙宇萱 | 0.5 天 | `docs/spike/spike-mysql-text-storage/` | qbank/exam 字段设计 |
 
 排期建议：SP-01 与 SP-02 并行先做（分别卡住 grading 与 exam 的接口设计），SP-03、SP-04 在周三前完成。
@@ -126,8 +126,8 @@
 
 **明确不做**：不引入 Quartz、调度框架或消息队列；不合并 `src/`。
 
-> **认领记录**：主执行 李昕彤，复核 钱斓轩。认领日期：2026-11-18。关联 Issue：#32。
-> **当前状态**：进行中；时间盒 0.5 天。为避免双写，`docs/spike/spike-auto-submit-trigger/` 只由主执行修改；钱斓轩只做复核与结论回填建议。
+> **认领记录**：主执行 钱斓轩，复核 李昕彤。认领日期：2026-11-18。关联 Issue：#32。
+> **当前状态**：进行中；时间盒 0.5 天。主执行负责 `docs/spike/spike-auto-submit-trigger/` 与实验；复核人只看 diff、证据与结论，不并行编辑。
 
 ---
 
