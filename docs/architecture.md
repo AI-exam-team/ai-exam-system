@@ -494,7 +494,7 @@ qbank  ◄──── exam  ◄──── grading
 #### 6.4.1 通用请求与响应约定
 
 - 路径 ID 均为非空字符串。以下接口无查询参数，除复核外无请求体。身份和角色只取自 JWT，不接受客户端传入 studentId、createdBy 或 reviewedBy。
-- 所有接口：JWT 缺失、无效或过期返回 401 UNAUTHORIZED；角色不符或资源不归属本人返回 403 FORBIDDEN；路径参数或请求体格式非法返回 400 VALIDATION_ERROR。错误体为 { code: string, message: string }。
+- 所有接口：JWT 缺失、无效或过期返回 401 UNAUTHORIZED；角色不符或资源不归属本人返回 403 FORBIDDEN；路径参数或请求体格式非法返回 400 VALIDATION_ERROR。错误体至少包含 { code: string, message: string }，并可包含统一响应约定中的 requestId。
 - 以下是第 9 周拆任务用的接口草案，新增错误码和审计字段见 [契约 v0.2 草案](https://github.com/AI-exam-team/ai-exam-system/blob/docs/issue-33-grading-contract/spec/contract-v0.2.md)。待契约评审及标注的未决行为确认后冻结。时间字段为带偏移量的 ISO 8601 字符串；以下 nullable 字段未产生时返回 null，空集合返回 []。
 
 | 类型 | 字段及类型 |
