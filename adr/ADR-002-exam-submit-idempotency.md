@@ -88,7 +88,7 @@ UPDATE answer_sheets
 2. 逐份执行第 2 条条件更新，参数：`submitted_at = paper.endAt`（**不是扫描时刻**，符合 AC-5 / contract 2.4），`submit_type='AUTO'`；
 3. 全部成功（或本来就没有 `DRAFT` 答卷）后，调用 qbank `markClosed(paperId)`。
 
-> `findDuePapers` 由 qbank 提供（Q-8），`markClosed` 由 qbank 提供（Q-1）；exam 不直接读 `papers` 表，也不直接 `UPDATE papers`。未裁决前，本节按受控命令描述，不作为可实现契约。
+> `findDuePapers` / `markClosed` 由 ADR-004 定义为 qbank 受控命令（提议，待评审）；exam 不直接读 `papers` 表，也不直接 `UPDATE papers`。
 
 **兜底机制**：学生在 `endAt` 后调用保存/交卷接口时，先对本人 `DRAFT` 答卷执行同一条件更新：
 
@@ -107,7 +107,7 @@ UPDATE answer_sheets
 2. 全部成功（或本来就没有 `DRAFT` 答卷）后，调用 qbank `markClosed(paperId)`（受控命令，见 Q-1）；零答卷试卷由 `findDuePapers` 枚举，不依赖 `answer_sheets` 是否存在；
 3. 任一份失败则本轮不关闭该试卷，下一轮重试，避免 `CLOSED` 后无法再自动交卷。
 
-> 写路径待 Q-1 裁决：`Paper` 归 qbank，exam 不能直接跨模块改表；集成侧拟新增 ADR-004 明确 `markPublished` / `markClosed`。见 `docs/architecture.md` 6.3.1 与 6.3.10。
+> 写路径由 ADR-004 裁决（提议）：`Paper` 归 qbank，exam 调用 `markClosed(paperId)`，不直接改表；见 `docs/architecture.md` 6.3.1 与 6.3.10。
 
 ### 6. 并发结果矩阵
 
@@ -144,7 +144,7 @@ UPDATE answer_sheets
 | SP-02 | MySQL 8.0.37 / REPEATABLE-READ / 50 线程 | C 方案 10 轮 × 50 并发：每轮 1 成功 / 49 冲突 / 1 行；A 仅唯一约束时无条件 `UPDATE` 2/2 成功；B 仅条件更新时并发插入 2 行；手动 vs 自动 1 成功 / 1 冲突，`AUTO` 未被覆盖；回滚后答案无残留 | 可行；唯一约束 + 条件更新缺一不可 |
 | SP-03 | MySQL 8.0.37 / 单实例 `ScheduledExecutorService` / 30s 扫描 | A 10/10，最大触发延迟 10.1s；B 5/10，5 份仍 `DRAFT`；C 10/10，0 重复；重启首轮 10/10 补齐 | 可行；采用定时扫描 + 请求兜底 |
 
-> SP-03 覆盖的是「有 `DRAFT` 答卷的试卷」的触发方式与漂移；**零答卷试卷关闭**由 `findDuePapers(now)` 枚举实现，SP-03 未覆盖，第 10 周补「零答卷 → CLOSED」测试。
+> SP-03 覆盖「有 `DRAFT` 答卷的试卷」的触发方式与漂移；**零答卷试卷关闭**另用最小表补充验证：3 张到期 `PUBLISHED` 试卷（1 张 10 份答卷、2 张零答卷）全部 `CLOSED`，`DRAFT` 与未到期试卷不受影响；第 10 周在正式表复跑。
 
 ## 备选方案
 
@@ -174,19 +174,19 @@ UPDATE answer_sheets
 - 自动交卷有最多约 30 秒的延迟；`submittedAt` 仍记为 `endAt`，但学生看到「已交卷」可能比 `endAt` 晚。
 - 单实例假设：多实例部署时两个调度器会同时扫描；条件更新保证不重复迁移，但会产生无效扫描。MVP1 单实例可接受；多实例需另起 ADR（如 ShedLock 或数据库抢占）。
 - `fixedDelay` 扫描会占用一个调度线程；单批 200 份、每份一次条件更新，正常规模可接受。
-- 试卷 `CLOSED` 的写路径尚未裁决（Q-1），实现前必须解决，否则自动交卷完成后无法正确关闭试卷。
-- 需要契约升版登记 `VALIDATION_ERROR`；`PAPER_NOT_DRAFT` 是否登记待集成负责人决定。
+- 试卷 `CLOSED` 的写路径由 ADR-004 裁决（qbank `markClosed`，提议待评审）；评审通过后才能实现。
+- 需要契约升版登记 `VALIDATION_ERROR`；`PAPER_NOT_DRAFT` 已在 5.1 登记，待契约 v0.2 转正式。
 
 ### 后续需要完成的事项
 
 - [x] SP-02：执行 50 并发 × 10 轮实验，回填成功/冲突/行数/`submitted_at` 数据（钱斓轩）。
 - [x] SP-03：执行三种触发方案对比，回填扫描间隔与漂移结论（钱斓轩主、李昕彤复核）。
-- [ ] 契约 v0.2：登记 `VALIDATION_ERROR`；决定 `PAPER_NOT_DRAFT` 是否入表（集成负责人）。
-- [ ] Q-1：裁决 `Paper` 发布/关闭写路径；建议 qbank `markPublished` / `markClosed` 受控命令 + 集成侧 ADR-004；同步 `architecture.md` 6.3.1 / 6.3.8（李昕彤 + qbank）。
+- [ ] 契约 v0.2：登记 `VALIDATION_ERROR`；`PAPER_NOT_DRAFT` 已入 5.1，待转正式（集成负责人）。
+- [x] Q-1：ADR-004 已提出（qbank `markPublished` / `markClosed`，提议待评审）；6.3.1 / 6.3.8 已按命令描述。
 - [ ] Q-2：G-01 若要求 `CLOSED` 后才能发布成绩，补 `ExamProgressForGrading` DTO（李昕彤 + 左恩东）。
-- [ ] Q-6：自动交卷扫描改为 qbank `findDuePapers(now)`；若仍做同库 JOIN，先补 ADR 例外（李昕彤 + 钱斓轩）。
-- [ ] Q-7：6.5 `PaperForExam` 补 `startAt` / `endAt` / `publishedAt` / `createdBy`，否则自动交卷无法判断窗口（李昕彤补 6.5，qbank 确认）。
-- [ ] Q-8：qbank 提供 `findDuePapers(now)` 枚举到期试卷（含零答卷）；第 10 周补「零答卷 → CLOSED」测试（李昕彤 + qbank）。
+- [x] Q-6：ADR-004 已改为 qbank `findDuePapers(now)`；不得同库 JOIN。
+- [x] Q-7：6.5 已在 `docs/32-exam-integration` 补齐 `startAt` / `endAt` / `publishedAt` / `createdBy`；qbank 确认。
+- [x] Q-8：ADR-004 提供 `findDuePapers(now)` 枚举到期试卷（含零答卷）；第 10 周补「零答卷 → CLOSED」测试。
 - [ ] 第 10 周测试：唯一约束、条件更新 0 行回滚、手动/自动并发、重启补扫、窗口边界、零答卷试卷关闭、兜底后 409。
 - [ ] 若 SP-02/SP-03 结论推翻假设，另起 ADR 替代本决策，并在本文件标注「被 ADR-XXXX 替代」。
 

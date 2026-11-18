@@ -20,7 +20,7 @@
 - **方案 C（定时 + 惰性兜底）**：10/10 完成，0 次重复迁移；前 5 份由惰性请求在 ~5.1s 完成，后 5 份由定时扫描在 ~10.1s 完成。
 - **重启补偿**：`endAt` 已过 5s 后启动扫描器，首轮扫描 10/10 补齐，最大延迟 ~5.1s，0 次重复。
 
-结论支持 ADR-002 的「定时扫描 + 请求兜底」：30s 间隔下最坏延迟不超过一个扫描周期（30s），在 `endAt + 60s` 目标内。限制：用 `ScheduledExecutorService` 模拟 `@Scheduled`，未接 Spring；单实例；未测多实例与调度器长时间停机；**零答卷试卷关闭未覆盖**，6.3.8 已改为 `findDuePapers(now)` 枚举到期试卷，第 10 周补「零答卷 → CLOSED」测试。
+结论支持 ADR-002 的「定时扫描 + 请求兜底」：30s 间隔下最坏延迟不超过一个扫描周期（30s），在 `endAt + 60s` 目标内。限制：用 `ScheduledExecutorService` 模拟 `@Scheduled`，未接 Spring；单实例；未测多实例与调度器长时间停机。**零答卷关闭已用最小表补充验证**：3 张到期 `PUBLISHED` 试卷（1 张 10 份答卷、2 张零答卷）全部 `CLOSED`；`DRAFT` 与未到期试卷不受影响；第 10 周在正式表复跑。
 
 ## 1. 验证问题
 
@@ -86,6 +86,20 @@ CREATE TABLE spike_sheets (
 > 实际时间用 `observed_at=NOW(3)` 记录触发时刻；`submitted_at` 按契约写 `end_at`，因此上表的延迟是「实际触发 - endAt」，不是 `submitted_at - endAt`。
 > 脚本与原始日志（`Sp03.java`）保留在本机探针目录，未合入 docs PR。
 
+### 3.6 零答卷试卷关闭（补充验证）
+
+最小表 `z_papers` / `z_sheets`，构造：
+
+| 试卷 | 初始状态 | `endAt` | 答卷 | 扫描后 |
+| --- | --- | --- | --- | --- |
+| P1 | PUBLISHED | 已到期 | 10 份 DRAFT | 10/10 SUBMITTED，`version=1`，P1 `CLOSED` |
+| P2 | PUBLISHED | 已到期 | 0 | `CLOSED` |
+| P3 | PUBLISHED | 已到期 | 0 | `CLOSED` |
+| P4 | DRAFT | 已到期 | 0 | 保持 `DRAFT`，不被扫描 |
+| P5 | PUBLISHED | 未到期 | 0 | 保持 `PUBLISHED`，不被扫描 |
+
+结果：`due papers found: 3`；P1/P2/P3 全部 `CLOSED`，P1 的 10 份答卷全部 `SUBMITTED`、`maxVersion=1`；P4/P5 不受影响。脚本 `Sp03Zero.java` 保留在本机探针目录。
+
 ## 4. 成功标准
 
 - 方案 A 或 C 在 `endAt + 60s` 内完成 10/10 自动交卷，0 次重复迁移。
@@ -117,4 +131,4 @@ CREATE TABLE spike_sheets (
 | 30 秒间隔在演示中等待较久 | 实验时间长 | 时间盒 0.5 天；只跑 10 份、1 分钟窗口 |
 | 惰性触发模拟的「学生请求」不真实 | 低估实际请求量 | 只用于证明「无人访问会漏交」，不作为生产方案 |
 | 进程重启测试需要停止/启动进程 | 可能漏记录 | 先记录基线，再重启，再记录首轮扫描结果 |
-| 零答卷试卷未被本轮实验覆盖 | 可能漏关 `CLOSED` | 6.3.8 改为 `findDuePapers(now)` 枚举到期试卷；第 10 周补「零答卷 → CLOSED」测试 |
+| 零答卷关闭只在最小表验证 | 正式表可能有差异 | 6.3.8 用 `findDuePapers(now)` 枚举；第 10 周在正式 `papers` / `answer_sheets` 上复跑 |
