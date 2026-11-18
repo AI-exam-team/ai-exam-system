@@ -471,13 +471,384 @@ qbank  ◄──── exam  ◄──── grading
 
 | 方法 | 路径 | 说明 | 成功 | 主要失败 |
 | --- | --- | --- | --- | --- |
-| POST | `/api/v1/papers/{id}/publish` | 发布考试，设置时间窗口 | 200 `Paper` | 409 `EMPTY_PAPER` / `PAPER_SCORE_MISMATCH` / `INVALID_EXAM_WINDOW` |
-| GET | `/api/v1/exams?status=AVAILABLE` | 学生可见考试列表 | 200 `ExamSummary[]` | 401 |
-| GET | `/api/v1/exams/{paperId}` | 学生进入考试页（不含评分点与参考答案） | 200 `ExamDetail` | 403 `EXAM_NOT_STARTED` / `EXAM_CLOSED`、404 |
-| POST | `/api/v1/exams/{paperId}/answer-sheet` | 进入考试，创建或返回本人 `DRAFT` 答卷 | 200/201 `AnswerSheet` | 403 `EXAM_NOT_STARTED` / `EXAM_CLOSED` |
-| PUT | `/api/v1/answer-sheets/{id}/answers` | 保存草稿（可批量按题覆盖） | 200 `{ savedAt }` | 409 `EXAM_ALREADY_SUBMITTED`、403、404 `ANSWER_SHEET_NOT_FOUND` |
-| POST | `/api/v1/answer-sheets/{id}/submit` | 手动交卷，携带全部答案 | 200 `AnswerSheet` | 409 `EXAM_ALREADY_SUBMITTED`、403、404 |
-| GET | `/api/v1/papers/{id}/answer-sheets` | 教师查看本人试卷的答卷 | 200 `AnswerSheetSummary[]` | 403、404 |
+| POST | `/api/v1/papers/{id}/publish` | 发布考试，设置时间窗口 | 200 `Paper` | 400 `VALIDATION_ERROR`、403 `FORBIDDEN`、404 `PAPER_NOT_FOUND`、409 `EMPTY_PAPER` / `PAPER_SCORE_MISMATCH` / `INVALID_EXAM_WINDOW` / `PAPER_NOT_DRAFT`（提案） |
+| GET | `/api/v1/exams?status=AVAILABLE` | 学生可见考试列表 | 200 `ExamSummary[]` | 400 `VALIDATION_ERROR`、401、403 |
+| GET | `/api/v1/exams/{paperId}` | 学生进入考试页（不含评分点与参考答案） | 200 `ExamDetail` | 401、403 `FORBIDDEN` / `EXAM_NOT_STARTED` / `EXAM_CLOSED`、404 `PAPER_NOT_FOUND` |
+| POST | `/api/v1/exams/{paperId}/answer-sheet` | 进入考试，创建或返回本人 `DRAFT` 答卷 | 200/201 `AnswerSheet` | 401、403 `FORBIDDEN` / `EXAM_NOT_STARTED` / `EXAM_CLOSED`、404 `PAPER_NOT_FOUND` |
+| PUT | `/api/v1/answer-sheets/{id}/answers` | 保存草稿（按题批量覆盖） | 200 `{ savedAt }` | 400 `VALIDATION_ERROR`、401、403 `FORBIDDEN` / `EXAM_NOT_STARTED` / `EXAM_CLOSED`、404 `ANSWER_SHEET_NOT_FOUND`、409 `EXAM_ALREADY_SUBMITTED` |
+| POST | `/api/v1/answer-sheets/{id}/submit` | 手动交卷，携带全部答案 | 200 `AnswerSheet` | 400 `VALIDATION_ERROR`、401、403 `FORBIDDEN` / `EXAM_NOT_STARTED` / `EXAM_CLOSED`、404 `ANSWER_SHEET_NOT_FOUND`、409 `EXAM_ALREADY_SUBMITTED` |
+| GET | `/api/v1/papers/{id}/answer-sheets` | 教师查看本人试卷的答卷 | 200 `AnswerSheetSummary[]` | 400 `VALIDATION_ERROR`、401、403 `FORBIDDEN`、404 `PAPER_NOT_FOUND` |
+
+> 本节字段由 exam 组确认；成功/失败分支、权限与 AC 映射按 6.3.1～6.3.7 逐接口写清。自动交卷触发方式见 6.3.8 与 ADR-002。
+> 身份字段（`studentId`、`createdBy`）一律取自 JWT `subject`，**不接受请求体传入**；跨模块 DTO 见 6.5 节。
+> 触发粒度（逐题 vs 整卷）待 G-08 决议；本表按单题幂等键设计，整卷批量不引入新的幂等语义。
+
+#### 6.3.1 POST /api/v1/papers/{id}/publish — 发布考试
+
+**请求**
+
+- 路径参数：`id` = `Paper.id`
+- 请求体：
+
+| 字段 | 类型 | 必填 | 约束与依据 |
+| --- | --- | --- | --- |
+| `startAt` | datetime | 是 | ISO-8601 带时区；发布时不得早于当前服务端时间（FR-1 / R3） |
+| `endAt` | datetime | 是 | ISO-8601 带时区；必须晚于 `startAt`，且发布时未过期（FR-1 / R3） |
+
+身份来源：JWT `role=TEACHER`；试卷 `createdBy` 必须等于 JWT `subject`，不接受请求体传入教师 ID。
+
+**成功 200：`Paper`**（字段见 contract 2.3）
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 试卷 / 考试 ID |
+| `title` | string | 试卷名称 |
+| `items` | `PaperItem[]` | `{ questionId, order, score }`，`order` 从 1 开始 |
+| `totalScore` | int | 各题分值之和 |
+| `status` | enum | `PUBLISHED` |
+| `startAt` / `endAt` | datetime | 本次发布设置的服务端时间 |
+| `publishedAt` | datetime | 服务端发布时刻，不由请求传入 |
+| `createdBy` | string | 试卷创建教师，取自 JWT |
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 400 | `VALIDATION_ERROR`（待登记） | 缺少 `startAt` / `endAt`；时间格式非法或无法解析 | 通用参数校验 |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是教师；或试卷 `createdBy` ≠ JWT `subject` | contract 第 5、6 节 |
+| 404 | `PAPER_NOT_FOUND`（待登记） | `id` 不存在 | 5.1 表 |
+| 409 | `PAPER_NOT_DRAFT`（提案） | 试卷当前状态不是 `DRAFT`（已发布或已关闭） | contract 3.1 状态机；需在 5.1 登记 |
+| 409 | `EMPTY_PAPER` | 试卷 `items` 为空 | contract 第 5 节 / AC-8 |
+| 409 | `PAPER_SCORE_MISMATCH` | `totalScore` ≠ 各 `items[].score` 之和 | contract 第 5 节 / AC-8 |
+| 409 | `INVALID_EXAM_WINDOW` | `startAt ≥ endAt`，或 `endAt` 不晚于当前服务端时间 | contract 第 5 节 / AC-8 / FR-1 |
+
+**权限**：仅教师，且仅本人创建的试卷；发布后试卷结构、分值与时间窗口不可修改（FR-1）。
+
+**对应 AC**：`module-02-exam.md` AC-1 / AC-8；FR-1、FR-2。
+
+> **跨模块待确认 Q-1**：`Paper` 由 qbank 产生，但发布需要写 `status` / `startAt` / `endAt` / `publishedAt`。6.2.4 又要求 exam 发布时“只改 `Paper.status`、不调用 qbank 写接口”，与“跨模块只读”的依赖规则冲突。需集成负责人 + qbank 在契约层二选一：① qbank 暴露受控的 `markPublished(paperId, startAt, endAt, publishedAt)` 写接口；② 发布字段迁到 exam 自有表（会改变“一份试卷即一场考试”的契约）。本接口暂按①描述，未裁决前不写实现。
+
+#### 6.3.2 GET /api/v1/exams?status=AVAILABLE — 学生可见考试列表
+
+**请求**
+
+| 参数 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| `status` | query | enum | 否 | 默认 `AVAILABLE`；MVP1 仅允许 `AVAILABLE`（已发布且当前在 `[startAt, endAt)` 内） |
+
+身份来源：JWT `role=STUDENT`；只返回与当前学生相关的可见考试，不接受 `studentId` 查询参数。
+
+**成功 200：`ExamSummary[]`**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `paperId` | string | 考试 / 试卷 ID |
+| `title` | string | 试卷名称 |
+| `totalScore` | int | 试卷总分 |
+| `startAt` / `endAt` | datetime | 服务端时间窗口 |
+| `status` | enum | `PUBLISHED` |
+| `answerSheetStatus` | enum | `NOT_STARTED` / `DRAFT` / `SUBMITTED`，按当前学生答卷派生（视图字段，不新增实体）；用于前端展示“未开始 / 作答中 / 已交卷” |
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 400 | `VALIDATION_ERROR`（待登记） | `status` 取值不是 `AVAILABLE` | 参数校验 |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是学生 | contract 第 6 节 |
+
+**权限**：仅学生；MVP1 不做参与名单，已发布且在窗口内的考试对全体学生可见（module-02 §8.4）。
+
+**对应 AC**：AC-2（进入前的可见性）、AC-7（窗口外不出现）；FR-2、FR-7。
+
+#### 6.3.3 GET /api/v1/exams/{paperId} — 学生进入考试页
+
+**请求**
+
+- 路径参数：`paperId` = `Paper.id`
+- 身份来源：JWT `role=STUDENT`
+
+**成功 200：`ExamDetail`**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `paperId` | string | 试卷 ID |
+| `title` | string | 试卷名称 |
+| `totalScore` | int | 试卷总分 |
+| `startAt` / `endAt` | datetime | 服务端时间窗口 |
+| `serverTime` | datetime | 服务端当前时间，供前端校准倒计时；**是否截止以服务端为准** |
+| `status` | enum | `PUBLISHED` |
+| `items` | `ExamItem[]` | `{ questionId, order, score, type, stem }`；**不含 `referenceAnswer` 与 `rubric`** |
+| `answerSheetId` | string / null | 当前学生已有答卷 ID；未进入过为 `null` |
+| `answerSheetStatus` | enum / null | `DRAFT` / `SUBMITTED`；无答卷为 `null` |
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是学生 | contract 第 6 节 |
+| 403 | `EXAM_NOT_STARTED` | 当前服务端时间早于 `startAt` | contract 第 5 节 / AC-7 |
+| 403 | `EXAM_CLOSED` | 当前服务端时间到达或超过 `endAt` | contract 第 5 节 / AC-7 |
+| 404 | `PAPER_NOT_FOUND`（待登记） | `paperId` 不存在，或试卷不是 `PUBLISHED`（不泄露 `DRAFT` 试卷是否存在） | 5.1 表 / contract 第 6 节 |
+
+**权限**：仅学生；只返回 `PUBLISHED` 试卷；评分点与参考答案永不下发（contract 第 6 节）。
+
+**对应 AC**：AC-2（进入）、AC-7（窗口）；FR-2、FR-7；contract 第 6 节。
+
+#### 6.3.4 POST /api/v1/exams/{paperId}/answer-sheet — 创建或返回本人答卷
+
+**请求**
+
+- 路径参数：`paperId` = `Paper.id`
+- 请求体：无（空对象 `{}` 可接受）；**不接受 `studentId`**
+- 身份来源：JWT `role=STUDENT`，`studentId` = JWT `subject`
+
+**成功**
+
+- **201 Created**：首次进入，创建 `DRAFT` 答卷，返回 `AnswerSheet`
+- **200 OK**：已有答卷（`DRAFT` 或 `SUBMITTED`），返回同一份，不新建
+
+`AnswerSheet` 字段（contract 2.4）：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | string | 答卷 ID |
+| `paperId` | string | 所属试卷 |
+| `studentId` | string | 取自 JWT，不接受请求体 |
+| `answers` | `Answer[]` | `{ questionId, content, savedAt }`；新建时为空数组 |
+| `status` | enum | `DRAFT` / `SUBMITTED` |
+| `startedAt` | datetime | 首次创建时间（服务端） |
+| `submittedAt` | datetime / null | 交卷后为服务端时间；`DRAFT` 为 `null` |
+| `submitType` | enum / null | `MANUAL` / `AUTO`；`DRAFT` 为 `null` |
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是学生 | contract 第 6 节 |
+| 403 | `EXAM_NOT_STARTED` | 当前服务端时间早于 `startAt` | contract 第 5 节 / AC-7 |
+| 403 | `EXAM_CLOSED` | 当前服务端时间到达或超过 `endAt`（即使已有答卷，也不再通过本接口进入） | contract 第 5 节 / AC-7 |
+| 404 | `PAPER_NOT_FOUND`（待登记） | 试卷不存在或不是 `PUBLISHED` | 5.1 表 |
+
+**权限**：仅学生本人；`(paperId, studentId)` 由数据库唯一约束保证最多一份答卷（R4）。并发首次进入时，唯一约束冲突的一方重新读取并返回已有答卷，不产生第二份。已交卷学生在窗口内重复进入返回 200；窗口外不再通过本接口进入，状态由 6.3.2 的 `answerSheetStatus` 展示。
+
+**对应 AC**：AC-2（首次/重复进入）、AC-7；FR-3、FR-8；R4。
+
+#### 6.3.5 PUT /api/v1/answer-sheets/{id}/answers — 保存草稿
+
+**请求**
+
+- 路径参数：`id` = `AnswerSheet.id`
+- 请求体：
+
+| 字段 | 类型 | 必填 | 约束与依据 |
+| --- | --- | --- | --- |
+| `answers` | `AnswerInput[]` | 是 | 至少 1 项；按 `questionId` 覆盖对应题，未出现的题保持不变 |
+| `answers[].questionId` | string | 是 | 必须属于本试卷；同一请求内不得重复 |
+| `answers[].content` | string | 是 | 允许空字符串（清空该题）；长度上限暂定 20,000 字符，待 SP-04 结论复核 |
+
+身份来源：JWT `role=STUDENT`；`sheet.studentId` 必须等于 JWT `subject`，不接受请求体传入。
+
+**成功 200**
+
+```json
+{ "savedAt": "2026-11-18T10:15:30+08:00" }
+```
+
+`savedAt` 为本次保存的服务端时间；同一请求内所有题共用该时间。
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 400 | `VALIDATION_ERROR`（待登记） | `answers` 缺失/为空/非数组；`content` 非字符串或超长；`questionId` 不属于本试卷；同一请求 `questionId` 重复 | 参数校验 / FR-4 |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是学生；或答卷 `studentId` ≠ JWT `subject` | contract 第 5、6 节 |
+| 403 | `EXAM_NOT_STARTED` | 当前服务端时间早于 `startAt` | contract 第 5 节 / AC-7 |
+| 403 | `EXAM_CLOSED` | 当前服务端时间到达或超过 `endAt`，且答卷仍为 `DRAFT` | contract 第 5 节 / AC-7 |
+| 404 | `ANSWER_SHEET_NOT_FOUND` | `id` 不存在 | contract 第 5 节 |
+| 409 | `EXAM_ALREADY_SUBMITTED` | 答卷已为 `SUBMITTED`（只读） | contract 第 5 节 / AC-6 |
+
+**检查顺序**：鉴权 → 答卷存在 → 归属 → 已交卷（409）→ 时间窗口（403）→ 请求体校验 → 按题覆盖。先判已交卷可以让重复保存/重试得到稳定的 409，而不是随窗口变化。
+
+**权限**：仅学生本人；教师不可写学生答卷。
+
+**对应 AC**：AC-3（保存与续答）、AC-6（交卷后拒绝保存）、AC-7（窗口）、AC-10（前端重试，服务端按最后一次覆盖）；FR-4、FR-7、FR-8。
+
+#### 6.3.6 POST /api/v1/answer-sheets/{id}/submit — 手动交卷
+
+**请求**
+
+- 路径参数：`id` = `AnswerSheet.id`
+- 请求体：
+
+| 字段 | 类型 | 必填 | 约束与依据 |
+| --- | --- | --- | --- |
+| `answers` | `AnswerInput[]` | 是 | **必须覆盖本试卷全部题目**；未作答的题传 `content: ""`；不得缺题、多题或重复 |
+| `answers[].questionId` | string | 是 | 必须属于本试卷 |
+| `answers[].content` | string | 是 | 允许空字符串；长度上限同 6.3.5 |
+
+身份来源：JWT `role=STUDENT`；`sheet.studentId` 必须等于 JWT `subject`。
+
+**成功 200：`AnswerSheet`**
+
+- `status` = `SUBMITTED`
+- `submitType` = `MANUAL`
+- `submittedAt` = 本次事务的服务端时间
+- `answers[]` 为本次提交的全量答案，`savedAt` = `submittedAt`
+- 其余字段同 6.3.4
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 400 | `VALIDATION_ERROR`（待登记） | `answers` 未覆盖全部题目 / 含多余题目 / 重复；`content` 非法或超长 | 参数校验 / AC-11 |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是学生；或答卷 `studentId` ≠ JWT `subject` | contract 第 5、6 节 |
+| 403 | `EXAM_NOT_STARTED` | 当前服务端时间早于 `startAt` | contract 第 5 节 / AC-7 |
+| 403 | `EXAM_CLOSED` | 当前服务端时间到达或超过 `endAt`，且答卷仍为 `DRAFT`（由自动交卷接管） | contract 第 5 节 / AC-7 |
+| 404 | `ANSWER_SHEET_NOT_FOUND` | `id` 不存在 | contract 第 5 节 |
+| 409 | `EXAM_ALREADY_SUBMITTED` | 答卷已为 `SUBMITTED`（重复点击、网络重试、自动交卷已先完成） | contract 第 5 节 / AC-6 |
+
+**事务与幂等**（详见 ADR-002）：
+
+1. 校验归属、窗口与请求体；
+2. 同一事务内按题 upsert 全量答案；
+3. 执行条件更新 `UPDATE ... SET status='SUBMITTED', submitted_at=?, submit_type='MANUAL' WHERE id=? AND status='DRAFT'`；
+4. 影响行数为 0 时**回滚答案写入**并返回 409；为 1 时提交。
+
+**窗口判定时点**：在请求处理开始时用服务端时间判定；若事务提交跨越 `endAt`，仍视为窗口内手动交卷，`submittedAt` 取提交时的服务端时间。
+
+**权限**：仅学生本人；交卷后答卷只读，不发生第二次状态迁移。
+
+**对应 AC**：AC-4（手动交卷）、AC-6（重复交卷）、AC-7（窗口）、AC-11（交卷不丢答案）；FR-5、FR-9；R5。
+
+#### 6.3.7 GET /api/v1/papers/{id}/answer-sheets — 教师查看本人试卷的答卷
+
+**请求**
+
+| 参数 | 位置 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| `id` | path | string | 是 | `Paper.id` |
+| `status` | query | enum | 否 | `DRAFT` / `SUBMITTED` / `ALL`，默认 `ALL` |
+
+身份来源：JWT `role=TEACHER`；`paper.createdBy` 必须等于 JWT `subject`。
+
+**成功 200：`AnswerSheetSummary[]`**
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `answerSheetId` | string | 答卷 ID |
+| `studentId` | string | 作答学生 ID |
+| `status` | enum | `DRAFT` / `SUBMITTED` |
+| `startedAt` | datetime | 开始作答时间 |
+| `submittedAt` | datetime / null | 交卷时间 |
+| `submitType` | enum / null | `MANUAL` / `AUTO` |
+| `answeredCount` | int | `content` 非空的已保存题目数 |
+| `questionCount` | int | 试卷题目总数 |
+
+> 本接口只给 exam 侧摘要；AI 建议分、评分点命中与复核字段属于 grading，见 6.4 的 `GradingSheetView`，不在本响应中重复。
+
+**失败响应**
+
+| HTTP | 错误码 | 触发条件 | 依据 |
+| --- | --- | --- | --- |
+| 400 | `VALIDATION_ERROR`（待登记） | `status` 不在允许范围 | 参数校验 |
+| 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
+| 403 | `FORBIDDEN` | 角色不是教师；或试卷 `createdBy` ≠ JWT `subject`；学生访问 | contract 第 5、6 节 |
+| 404 | `PAPER_NOT_FOUND`（待登记） | 试卷不存在 | 5.1 表 |
+
+**权限**：仅试卷创建教师；学生不可访问。
+
+**对应 AC**：AC-9（越权与不存在）；contract 第 6 节。module-02 无独立 AC，本接口作为教师复核入口的前置能力，跨模块消费见 6.5 `SubmittedSheetForGrading`。
+
+#### 6.3.8 自动交卷触发方式（ADR-002 决策摘要）
+
+> 完整取舍、并发 SQL 与失败语义见 `adr/ADR-002-exam-submit-idempotency.md`；本节只写 exam 接口可见的行为。
+
+| 项 | 确认结果 |
+| --- | --- |
+| 主触发 | 单实例 `@Scheduled(fixedDelay = 30s)` 扫描 exam 自有 `answer_sheets` 中 `status='DRAFT'` 的答卷；对去重后的 `paperId` 走 qbank 只读接口 `PaperForExam` 取 `status/endAt`，仅对 `PUBLISHED` 且 `endAt <= now` 的执行条件更新（**不直接 JOIN qbank 表**） |
+| 兜底触发 | 学生在 `endAt` 后调用进入/保存/交卷时，先对本人 `DRAFT` 答卷执行同一条件更新，再返回 `EXAM_CLOSED`；不单独依赖惰性触发（无人访问会漏交） |
+| 状态迁移 | 条件更新 `WHERE status='DRAFT'`；每份答卷最多一次 `DRAFT → SUBMITTED` |
+| 时间字段 | `submitType='AUTO'`；`submittedAt = papers.endAt`（不是扫描时刻，符合 AC-5 / contract 2.4） |
+| 答案来源 | 以最后一次成功保存的答案为准；未保存内容不阻塞交卷（FR-6） |
+| 重启补偿 | 进程重启后首轮扫描自动补齐；无需补偿表 |
+| 试卷关闭 | 到达 `endAt` 后，先完成该试卷所有 `DRAFT` 答卷的自动交卷，再条件更新 `PUBLISHED → CLOSED`；仍有失败则本轮不关闭，下一轮重试（写路径见 Q-1） |
+| 失败处理 | 单份失败记录日志并在下一轮重试；不因一份失败阻塞其他答卷；连续失败升级人工 |
+| 参数待验证 | 扫描间隔 30s、单批上限 200 份、`endAt + 60s` 内完成率，由 SP-03 回填；不达标则调整间隔或改为更短周期 |
+
+> 扫描实现不得直接读取 qbank 的 `papers` 表；跨模块读取走 6.5 `PaperForExam`。若第 9 周为性能需要同库 JOIN，先补 ADR 例外（Q-6）。
+> 当前 `PaperForExam` 还缺 `endAt` / `createdBy`，见 Q-7；补齐前 6.3.8 的扫描只能停留在逻辑描述。
+
+#### 6.3.9 数据流与风险
+
+**成功路径**
+
+```text
+教师登录（integration，JWT role=TEACHER）
+  → POST /papers/{id}/publish：归属 → 状态 DRAFT → 非空 → 总分一致 → startAt < endAt 且未过期
+      → Paper: DRAFT → PUBLISHED，publishedAt 为服务端时间
+学生登录（JWT role=STUDENT）
+  → GET /exams?status=AVAILABLE：只返回 PUBLISHED 且当前在窗口内的考试
+  → GET /exams/{paperId}：返回题干与 serverTime，不下发评分点/参考答案
+  → POST /exams/{paperId}/answer-sheet：唯一约束创建或返回本人 DRAFT 答卷
+  → PUT /answer-sheets/{id}/answers：按题覆盖，savedAt 为服务端时间
+  → POST /answer-sheets/{id}/submit：全量答案 + 条件更新 DRAFT → SUBMITTED（MANUAL）
+  → grading 通过 SubmittedSheetForGrading 只读消费（仅 SUBMITTED）
+到 endAt：
+  → 定时扫描（或学生请求兜底）条件更新 DRAFT → SUBMITTED（AUTO，submittedAt=endAt）
+  → 该试卷全部答卷 SUBMITTED 后 PUBLISHED → CLOSED
+```
+
+**失败路径与不变式**
+
+| 失败场景 | 返回 | 必须保持不变 |
+| --- | --- | --- |
+| 发布时非 `DRAFT` | 409 `PAPER_NOT_DRAFT`（提案） | 原状态、`publishedAt`、窗口均不变 |
+| 发布时为空 / 总分不一致 / 窗口非法 | 409 对应错误码 | 试卷仍为 `DRAFT`，不写 `publishedAt` |
+| 窗口外进入 / 保存 / 交卷 | 403 `EXAM_NOT_STARTED` / `EXAM_CLOSED` | 不创建、不修改答卷 |
+| 重复交卷（含网络重试） | 409 `EXAM_ALREADY_SUBMITTED` | 答案、`submittedAt`、`submitType` 均不变 |
+| 手动交卷与自动交卷并发 | 一方成功，另一方 409 或静默跳过 | 只有一次 `DRAFT → SUBMITTED`，`submittedAt` 不被覆盖 |
+| 交卷请求体缺题 / 多题 / 重复 | 400 `VALIDATION_ERROR` | 事务回滚，答卷保持 `DRAFT`，答案不变 |
+| 越权访问他人答卷 | 403 `FORBIDDEN` | 不泄露资源是否存在与内容 |
+| 自动交卷单份失败 | 记录日志，下一轮重试 | 该答卷保持 `DRAFT`，不写入半份答案 |
+
+**风险 R-01 / R-08：交卷并发与自动交卷触发**
+
+| 项 | 内容 |
+| --- | --- |
+| 风险 | 手动交卷、网络重试、到点自动交卷与定时扫描可能同时到达；若没有单一条件更新，会重复迁移、覆盖 `submittedAt` 或产生第二份答卷；若调度漏扫，`DRAFT` 答卷会阻塞 grading |
+| 影响 | grading 无法开始或读到不一致数据；学生看到错误状态；成绩发布被阻塞 |
+| 应对 | ① `(paper_id, student_id)` 唯一约束；② `UPDATE ... WHERE status='DRAFT'` 条件更新；③ 手动交卷在同一事务内写答案并迁移；④ 定时扫描 + 请求兜底；⑤ `submittedAt` 手动取服务端时间、自动取 `endAt` |
+| 验证 | SP-02（50 并发 × 10 轮，仅 1 次成功）；SP-03（10 份答卷，`endAt + 60s` 内 10/10，0 次重复）；AC-5 / AC-6 / FR-9 |
+| 负责人 | 钱斓轩（主）、李昕彤（复核） |
+
+#### 6.3.10 与 grading 的契约对齐
+
+| 对齐点 | exam 侧保证 | grading 侧约束 |
+| --- | --- | --- |
+| 可评分对象 | 只有 `SUBMITTED` 答卷进入 `SubmittedSheetForGrading`；`DRAFT` 不暴露 | 不读取、不评分 `DRAFT` 答卷 |
+| 交卷方式 | `submitType` 区分 `MANUAL` / `AUTO`；`AUTO` 的 `submittedAt=endAt` | 评分逻辑不依赖 `submitType`，两者同等可评 |
+| 答案冻结 | 交卷后答案只读；重复交卷/保存不改变内容 | 只读消费，不回写答案 |
+| 时间权威 | `startedAt`、`savedAt`、`submittedAt` 全部为服务端时间 | 以 `submittedAt` 作为评分与审计时间 |
+| 试卷关闭 | `endAt` 后 `PUBLISHED → CLOSED`（写路径见 Q-1） | 若 G-01 要求关闭后才能发布成绩，需 exam 提供只读进度；当前 6.5 未定义，待 G-01 决议后补 DTO |
+| 教师视图 | `GET /papers/{id}/answer-sheets` 只给答卷摘要 | `GET /papers/{id}/grading-sheets` 给 AI/复核字段，二者不重复 |
+
+**待确认项（交集成负责人裁决）**
+
+| 编号 | 问题 | 影响 | 建议 |
+| --- | --- | --- | --- |
+| Q-1 | `Paper` 的发布/关闭写路径：qbank 受控写接口，还是 exam 自有表？ | 6.3.1 / 6.3.8 无法落地实现 | 李昕彤 + qbank 在契约层定；未定前不写实现 |
+| Q-2 | G-01 是否要求试卷 `CLOSED` 后才能发布成绩？ | 决定是否需要 `ExamProgressForGrading` DTO | 李昕彤 + 左恩东在接口冻结前定 |
+| Q-3 | `PAPER_NOT_DRAFT` 是否登记为正式错误码？ | 发布重复点击的行为 | 集成负责人在 5.1 登记；登记前按提案名使用 |
+| Q-4 | 答案 `content` 长度上限 | 保存/交卷校验与 DB 字段 | SP-04 结论回填；暂定 20,000 字符 |
+| Q-5 | 自动交卷扫描间隔与漂移 | `endAt + 60s` 完成率 | SP-03 回填 ADR-002；暂定 30s / 单批 200 |
+| Q-6 | 自动交卷扫描读取 `papers.status/end_at` 的实现路径 | 影响扫描性能与依赖合规 | 优先 qbank 只读接口；同库 JOIN 需 ADR 例外 |
+| Q-7 | 6.5 的 `PaperForExam` 缺少 `startAt` / `endAt` / `publishedAt` / `createdBy` | exam 无法做窗口控制、自动交卷与归属校验 | qbank + 集成负责人在 6.5 补齐字段；跨模块 DTO 变更走 ADR |
 
 ### 6.4 AI 阅卷与复核（grading）
 
@@ -612,3 +983,4 @@ qbank  ◄──── exam  ◄──── grading
 | 版本 | 日期 | 变更人 | 变更内容 |
 | --- | --- | --- | --- |
 | v0.1 | 2026-11-17 | 李昕彤 | 建立架构基线：模块边界、四层架构、单向依赖、统一接口规范、跨模块 DTO、成功/失败数据流、冻结范围、ADR 映射与第 9 周任务映射 |
+| v0.1-exam | 2026-11-18 | 钱斓轩 | 补充 exam 模块 6.3.1～6.3.10：逐接口请求/响应字段、失败码触发条件、权限与 AC 映射、自动交卷触发方式、成功/失败数据流与风险、与 grading 对齐及 Q-1～Q-5 待确认项 |
