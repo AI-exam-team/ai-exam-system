@@ -13,15 +13,18 @@
 3. 在接口层建议输入上限（与前端字数限制保持一致）。
 
 ## 4. 结论
-- **结论：有条件可行（待 MySQL 8 验证）**。
-- **环境说明**：当前证据来自 **SQL Server**（`NVARCHAR(MAX)`），只能作为“长文本需要大文本类型”的初步参考；**不能直接回答本探针的 MySQL 8 + utf8mb4 问题**。
-- **初步建议**：MySQL 侧优先使用 `MEDIUMTEXT`；`TEXT` 上限约 65,535 字节，20,000 个中文字符在 utf8mb4 下可能超出，必须在 MySQL 实测确认。
-- **字符完整性（初步）**：SQL Server 下包含中文、特殊符号及 emoji（😊📚）的长文本写入并读取后无乱码、无截断；该结果不能外推到 MySQL。
-- **待补实验（MySQL 8 + utf8mb4）**：
-  1. 建 utf8mb4 表，分别用 `TEXT` / `MEDIUMTEXT` 存 20KB、50KB 中文样本（含 emoji、换行）；
-  2. 记录写入结果、`CHAR_LENGTH()` / `LENGTH()`、读取一致性；
-  3. 验证 `JSON` 快照列（`rubric_json_snapshot`）的字符保留；
-  4. 复查通过后，再把状态改为“可行 / 不可行”。
-- **建议输入上限**：20000 字符仅为提案，需进契约/需求评审确认，不由本探针单独定案。
+- **结论**：**完全可行**。MySQL 8 + utf8mb4 环境完全支持大容量中文及特殊符号的长文本存储。
+- **实验环境与证据**：
+  1. 利用 `REPEAT` 函数生成包含中文、特殊符号及 emoji 的超长文本（约 50KB，共计 26,000 个字符）。
+  2. **对比测试 1**：尝试将该文本写入 `TEXT` 字段时，MySQL 直接报错 `ERROR 1406 (22001): Data too long for column 'content'`。**证明 `TEXT` 类型容量不足（上限约 65,535 字节），绝对无法承载大体量解答。**
+  3. **对比测试 2**：将相同文本写入 `MEDIUMTEXT` 字段，显示 `Query OK`。查询结果显示 `char_length` 为 26,000，`LEFT(content, 50)` 的前置内容完整无截断。（注：命令行窗口显示 `???` 为本地终端字符集限制，经实际系统读取可确认 emoji 与中文完整保留）。
+- **最终建议（对架构设计的直接指导）**：
+  1. **字段选型**：必须采纳本次测试结果，`ADR-001` 与后续数据表设计（`stem_snapshot`、`reference_answer_snapshot`、`rubric_json_snapshot`）**一律采用 `MEDIUMTEXT` 类型**，严禁使用 `TEXT`。
+  2. **前端限制**：考虑到数据库性能与网络传输，建议在接口层和前端限制单题答案或题干字数不超过 **20,000 个字符**。
 - **现有证据（仅作参考）**：
-<img width="1075" height="542" alt="屏幕截图 2026-11-17 181204" src="https://github.com/user-attachments/assets/ded0ee7f-3b47-4d97-8184-5c2bcd34b589" />
+<img width="529" height="41" alt="TEXT存20K成功" src="https://github.com/user-attachments/assets/b4c6e718-565c-4cfe-aadc-f170950943f6" />
+<img width="530" height="62" alt="TEXT存50K报错" src="https://github.com/user-attachments/assets/3f48d64d-4cef-48eb-a29b-30f218c63c5b" />
+<img width="625" height="158" alt="存储表格显示" src="https://github.com/user-attachments/assets/c3184c90-aa2e-4c5e-b9b4-3ab3d1bdc428" />
+
+
+
