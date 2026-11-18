@@ -483,13 +483,67 @@ qbank  ◄──── exam  ◄──── grading
 
 | 方法 | 路径 | 说明 | 成功 | 主要失败 |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/papers/{id}/grading-sheets` | 教师查看逐题评分状态 | 200 `GradingSheetView` | 403（非本人试卷）、404 |
+| GET | `/api/v1/papers/{id}/grading-sheets` | 教师查看逐题评分状态 | 200 `GradingSheetView[]` | 403（非本人试卷）、404 |
 | POST | `/api/v1/answer-sheets/{id}/questions/{questionId}/ai-grade` | 触发单题初评（整卷批量=循环调用） | 200 `GradeResult` | 409 `ANSWER_NOT_SUBMITTED` / `AI_GRADING_IN_PROGRESS`、502 `AI_SERVICE_TIMEOUT` / `AI_OUTPUT_INVALID` / `AI_SCORE_OUT_OF_RANGE` |
 | PUT | `/api/v1/answer-sheets/{id}/questions/{questionId}/review` | 教师复核并写确认分 | 200 `GradeResult` | 400 `INVALID_REVIEWED_SCORE`、403、404 |
 | POST | `/api/v1/papers/{id}/grades/publish` | 整场发布成绩 | 200 `{ publishedAt }` | 409 `GRADE_NOT_FULLY_REVIEWED`、403 |
 | GET | `/api/v1/my/grades/{paperId}` | 学生查本人成绩 | 200 `PublishedGrade` | 403 `SCORE_NOT_PUBLISHED`、404 |
 
 > 触发粒度（逐题 vs 整卷）待 G-08 决议；本表按单题幂等键设计，整卷批量不引入新的幂等语义。
+
+#### 6.4.1 通用请求与响应约定
+
+- 路径 ID 均为非空字符串。以下接口无查询参数，除复核外无请求体。身份和角色只取自 JWT，不接受客户端传入 studentId、createdBy 或 reviewedBy。
+- 所有接口：JWT 缺失、无效或过期返回 401 UNAUTHORIZED；角色不符或资源不归属本人返回 403 FORBIDDEN；路径参数或请求体格式非法返回 400 VALIDATION_ERROR。错误体为 { code: string, message: string }。
+- 以下是第 9 周拆任务用的接口草案。新增错误码及标注待决的行为由集成负责人确认后冻结。时间字段为带偏移量的 ISO 8601 字符串；以下 nullable 字段未产生时返回 null，空集合返回 []。
+
+| 类型 | 字段及类型 |
+| --- | --- |
+| RubricHit | rubricItemId: string, hit: boolean, score: integer, reason: string |
+| GradingItem | questionId: string, aiStatus: NOT_STARTED / PENDING / SUCCEEDED / FAILED, rubricHits: RubricHit[]（未成功为 []）, aiScore: integer nullable, aiReason: string nullable, reviewedScore: integer nullable, reviewComment: string nullable, reviewedAt: datetime nullable |
+| GradeResult | GradingItem 全部字段，加 id: string, answerSheetId: string, reviewedBy: string nullable |
+| GradingSheetView | answerSheetId: string, items: GradingItem[] |
+| PublishedGrade | paperId: string, totalScore: integer（教师确认分之和）, items: { questionId: string, reviewedScore: integer, reviewComment: string nullable }[] |
+
+#### 6.4.2 GET /api/v1/papers/{id}/grading-sheets
+
+- 请求：id 为试卷 ID。
+- 成功 200：GradingSheetView[]，每份 SUBMITTED 答卷一项，每道试卷题目一条，无评分记录显示 NOT_STARTED。此处明确总览表中的响应为列表，待接口评审确认。
+- 失败：404 PAPER_NOT_FOUND（试卷不存在）。无已提交答卷返回空数组。
+- 权限：教师，校验 Paper.createdBy 等于 JWT subject。
+- 对应 [module-03](../spec/module-03-grading.md) AC-1 / AC-12 / AC-14。
+
+#### 6.4.3 POST /api/v1/answer-sheets/{id}/questions/{questionId}/ai-grade
+
+- 请求：id 为答卷 ID，questionId 为该答卷所属试卷中的题目 ID。
+- 成功 200：GradeResult，校验成功后返回，已有 SUCCEEDED 则复用。按单题幂等，整卷操作入口仍待 G-08。
+- 失败：404 ANSWER_SHEET_NOT_FOUND（答卷不存在）；404 QUESTION_NOT_FOUND（题目不属于对应试卷）；409 ANSWER_NOT_SUBMITTED（答卷为 DRAFT）；409 AI_GRADING_IN_PROGRESS（该题处于 PENDING）；502 AI_SERVICE_TIMEOUT（模型超时）；502 AI_OUTPUT_INVALID（JSON 无法解析，字段、评分点 ID 或评分规则校验失败）；502 AI_SCORE_OUT_OF_RANGE（AI 分数超过合法范围，错误优先级待 G-03）。重试耗尽后的再次触发、非超时上游故障、迟到响应的 HTTP 映射待 ADR-003 / G-03。
+- 权限：教师，通过答卷的 paperId 校验 Paper.createdBy 等于 JWT subject，再校验题目归属。模型失败后允许人工复核。
+- 对应 [module-03](../spec/module-03-grading.md) AC-1～AC-6 / AC-12～AC-14。
+
+#### 6.4.4 PUT /api/v1/answer-sheets/{id}/questions/{questionId}/review
+
+- 请求：路径参数同 6.4.3。请求体 { reviewedScore: integer（必填）, reviewComment?: string }。
+- 成功 200：GradeResult，包含确认分、JWT 对应教师 ID 和服务端复核时间，保留已有 AI 结果。
+- 失败：400 INVALID_REVIEWED_SCORE（确认分缺失、非整数或超出 [0, 题目分值]）；404 ANSWER_SHEET_NOT_FOUND（答卷不存在）；404 QUESTION_NOT_FOUND（题目不属于对应试卷）；409 ANSWER_NOT_SUBMITTED（草稿答卷，复用码待确认）。发布后能否改分待 G-02，未初评或初评中能否人工确认待 G-04。
+- 权限：教师，通过答卷所属试卷校验 Paper.createdBy 等于 JWT subject，并校验题目归属。
+- 对应 [module-03](../spec/module-03-grading.md) AC-6～AC-8 / AC-12～AC-14。
+
+#### 6.4.5 POST /api/v1/papers/{id}/grades/publish
+
+- 请求：id 为试卷 ID。
+- 成功 200：{ publishedAt: datetime }，整场原子发布，按确认分汇总。重复请求不得改变成绩，原发布时间的返回规则待 G-02。
+- 失败：404 PAPER_NOT_FOUND（试卷不存在）；409 GRADE_NOT_FULLY_REVIEWED（任一已提交答卷存在未确认题目，0 分为有效确认）。是否必须等考试结束及无答卷时的行为待 G-01。
+- 权限：教师，校验 Paper.createdBy 等于 JWT subject。
+- 对应 [module-03](../spec/module-03-grading.md) AC-9 / AC-10 / AC-12 / AC-13。
+
+#### 6.4.6 GET /api/v1/my/grades/{paperId}
+
+- 请求：paperId 为试卷 ID。
+- 成功 200：PublishedGrade，仅返回本人确认分、教师意见和总分。
+- 失败：404 ANSWER_SHEET_NOT_FOUND（按 JWT 身份和 paperId 查无本人已提交答卷）；403 SCORE_NOT_PUBLISHED（有本人已提交答卷但整场成绩未发布）。不得根据其他学生是否交卷改变响应。
+- 权限：学生，按 (paperId, JWT subject) 查本人答卷。
+- 对应 [module-03](../spec/module-03-grading.md) AC-10 / AC-11 / AC-12。
 
 ### 6.5 跨模块交接数据
 

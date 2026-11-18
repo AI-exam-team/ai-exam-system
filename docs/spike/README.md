@@ -68,7 +68,7 @@ docs/spike/spike-<topic>/
 
 | 编号 | 主题 | 目录 | 负责人 | 状态 | 结论 |
 | --- | --- | --- | --- | --- | --- |
-| SP-01 | DeepSeek 结构化评分输出、延迟与费用 | `docs/spike/spike-deepseek-grading/` | 左恩东 / 王麒博 | 计划中 | - |
+| SP-01 | DeepSeek 结构化评分输出、延迟与费用 | `docs/spike/spike-deepseek-grading/` | 左恩东（主执行） / 王麒博（复核） | 进行中 | [#33](https://github.com/AI-exam-team/ai-exam-system/issues/33)，待实测 |
 | SP-02 | MySQL 并发交卷幂等 | `docs/spike/spike-mysql-submit-idempotency/` | 钱斓轩 | 计划中 | - |
 | SP-03 | 自动交卷触发方式与调度漂移 | `docs/spike/spike-auto-submit-trigger/` | 李昕彤 / 钱斓轩 | 计划中 | - |
 | SP-04 | 长文本答案与 utf8mb4 存储 | `docs/spike/spike-mysql-text-storage/` | 周裔（主执行） / 孙宇萱（复核） | 有条件可行（待 MySQL 8 重跑） | SQL Server 初步；MySQL 待验证 |
