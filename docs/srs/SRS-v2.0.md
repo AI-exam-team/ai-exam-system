@@ -7,7 +7,7 @@
 | 日期 | 2026-11-17 |
 | 负责人 | 李昕彤（集成与契约） |
 | 关联任务 | 第 8 周 SRS 更新 |
-| 依据 | `context.md` v0.1；`spec/mvp1-scope.md` v0.1；`spec/contract-v0.1.md`；`spec/module-01-qbank.md` v0.2；`spec/module-02-exam.md` v0.2；`spec/module-03-grading.md` v0.2（评审中）；`docs/architecture.md` v0.1（第 8 周架构 PR）；`adr/ADR-001-qbank-snapshot.md`（提议）；`adr/ADR-003`（提议，随第 8 周架构 PR 合入） |
+| 依据 | `context.md` v0.1；`spec/mvp1-scope.md` v0.1；`spec/contract-v0.1.md`；`spec/module-01-qbank.md` v0.2；`spec/module-02-exam.md` v0.2；`spec/module-03-grading.md` v0.2（评审中）；`docs/architecture.md` v0.1（第 8 周架构 PR）；`adr/ADR-001-qbank-snapshot.md`（提议）；`adr/ADR-004-paper-lifecycle-write-path.md`（提议）；`adr/ADR-003`（提议，随第 8 周架构 PR 合入） |
 | 历史版本 | `docs/reference/AI智能考试系统_SRS_v1.3_架构导读优化稿.docx`（只读归档，仅作参考） |
 
 > **文档定位**：本文件是第 8 周的需求汇总视图，替代 v1.3 作为团队当前需求基线。
@@ -241,7 +241,7 @@ grading（AI 建议分 → 教师复核 → 成绩发布）
 
 | 编号 | 需求 | 角色 | 主流程与规则 | 异常 / 错误码 |
 | --- | --- | --- | --- | --- |
-| FR-10 | 发布考试 | 教师 | 仅 `DRAFT` 试卷可发布；发布前校验至少 1 题、总分一致、`startAt < endAt` 且 `endAt` 未过期；发布后 `PUBLISHED`，记录服务端 `publishedAt`；结构、每题分值与时间窗口不可修改 | 409 `EMPTY_PAPER` / `PAPER_SCORE_MISMATCH` / `INVALID_EXAM_WINDOW` |
+| FR-10 | 发布考试 | 教师 | 仅 `DRAFT` 试卷可发布；发布前校验至少 1 题、总分一致、`startAt < endAt` 且 `endAt` 未过期；发布后 `PUBLISHED`，记录服务端 `publishedAt`；结构、每题分值与时间窗口不可修改；非 `DRAFT` 重复发布拒绝 | 409 `EMPTY_PAPER` / `PAPER_SCORE_MISMATCH` / `INVALID_EXAM_WINDOW` / `PAPER_NOT_DRAFT` |
 | FR-11 | 考试可见性 | 学生 | 仅 `PUBLISHED` 考试对学生可见；MVP1 对全体学生可见，不建参与名单 | 未开始 403 `EXAM_NOT_STARTED`；已关闭 403 `EXAM_CLOSED` |
 | FR-12 | 考试关闭 | 系统 | 到达 `endAt` 后试卷进入 `CLOSED`，学生不可再进入或作答 | 窗口外操作 403 `EXAM_CLOSED` |
 
@@ -472,6 +472,7 @@ AI 超时 / 非法 JSON / 评分点不匹配 / 分数越界
 | 失败响应 | `{ "code": "...", "message": "...", "requestId": "..." }`；禁止用 200 表示失败 |
 | 跨模块调用 | 进程内只读接口 + DTO；禁止直接读写其他模块的表；禁止事件总线 |
 | 核心 DTO | `PaperForExam`、`QuestionForGrading`、`SubmittedSheetForGrading`、`PublishedGrade`、`GradingSheetView`（字段见 `docs/architecture.md` 6.5） |
+| 跨模块命令 | Paper 发布/关闭只通过 qbank 的 `PaperLifecyclePort`（`markPublished` / `markClosed`）；exam 不直接写 qbank 表（ADR-004） |
 
 模块接口清单与路径以 `docs/architecture.md` 第 6 节为准；模块组评审确认后冻结。
 
@@ -498,6 +499,7 @@ AI 超时 / 非法 JSON / 评分点不匹配 / 分数越界
 | `SCORE_NOT_PUBLISHED` | 403 | 成绩未发布，学生查询 | grading | 已确定 |
 | `VALIDATION_ERROR` | 400 | 通用参数校验失败（缺字段、类型错误、非法枚举） | integration / 各模块 | 待契约 v0.2 |
 | `PAPER_NOT_FOUND` | 404 | 试卷不存在 | qbank / exam | 待契约 v0.2 |
+| `PAPER_NOT_DRAFT` | 409 | 试卷当前状态不是 `DRAFT`（重复发布或已关闭） | qbank（经 exam 返回） | 待契约 v0.2 |
 | `QUESTION_NOT_ACTIVE` | 409 | 组卷引用非 `ACTIVE` 题目 | qbank | 待契约 v0.2 |
 | `QUESTION_ALREADY_USED` | 409 | 题目被任一 `PUBLISHED` 试卷引用，禁止修改 | qbank | 待契约 v0.2 |
 | `ANSWER_NOT_SUBMITTED` | 409 | 对草稿答卷触发 AI 初评 | grading | 待契约 v0.2 |
@@ -581,6 +583,7 @@ NOT_READY ──全部已提交答卷的每题均有 reviewedScore──► READ
 | DC-12 | 密码 BCrypt 存储；时间字段一律服务端生成 |
 | DC-13 | 组卷时保存基线快照，发布时随 `Paper.status=PUBLISHED` 冻结为正式快照；下游只读快照（ADR-001 提议，待评审通过后生效） |
 | DC-14 | 题目被任一 `PUBLISHED` 试卷引用时禁止修改，返回 409 `QUESTION_ALREADY_USED`（锁题策略，待契约 v0.2 登记） |
+| DC-15 | Paper 的发布/关闭由 qbank 的受控命令执行，exam 不直接写 qbank 表；自动交卷扫描以到期试卷为起点（ADR-004） |
 
 ### 7.4 权限与可见性
 
@@ -714,6 +717,7 @@ NOT_READY ──全部已提交答卷的每题均有 reviewedScore──► READ
 | 编号 | 问题 | 影响 | 负责人 | 计划 / 依据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
 | C-01 | 已发布试卷取题目快照还是动态引用？历史试卷、答卷、评分结果取哪一版？ | 题目修改后历史一致性 | 孙宇萱 + 李昕彤 | ADR-001（提议：基线快照 + 发布冻结） | 评审中 |
+| Q-1 | Paper 发布/关闭的跨模块写路径 | 发布与自动交卷关闭 | 李昕彤 + 孙宇萱 / 钱斓轩 | ADR-004（提议：qbank 受控命令） | 评审中 |
 | C-02 | ID 格式与生成方式（UUID / 雪花 / 自增） | 接口与数据库设计 | 李昕彤 | 第 8 周 ADR 或架构附录 | 待决议 |
 | C-03 | 交卷并发与自动交卷幂等的具体实现 | exam 实现与测试 | 钱斓轩 | ADR-002 | 待决议 |
 | C-04 | AI 输出 JSON 物理字段、校验 schema、同步/异步表达 | grading 接口冻结 | 王麒博 + 李昕彤 | ADR-003 / SP-01 | 待决议 |
@@ -776,13 +780,15 @@ NOT_READY ──全部已提交答卷的每题均有 reviewedScore──► READ
 8. `docs/dependency.md` v0.1（第 8 周架构 PR）— 依赖与风险分析。
 9. `adr/ADR-003-grading-ai-invocation-and-idempotency.md`（提议，随第 8 周架构 PR 合入）— AI 调用与幂等。
 10. `adr/ADR-001-qbank-snapshot.md`（提议）— 题目基线快照、发布冻结与锁题策略。
-11. `docs/reference/AI智能考试系统_SRS_v1.3_架构导读优化稿.docx` — 历史版本，仅作参考。
+11. `adr/ADR-004-paper-lifecycle-write-path.md`（提议）— Paper 发布/关闭的 qbank 受控命令与到期试卷扫描。
+12. `docs/reference/AI智能考试系统_SRS_v1.3_架构导读优化稿.docx` — 历史版本，仅作参考。
 
 ### 10.4 修订记录
 
 | 版本 | 日期 | 作者 | 变更内容 |
 | --- | --- | --- | --- |
 | v2.0 | 2026-11-17 | 李昕彤 | 按当前锁定范围重写 SRS：两角色、仅主观题、三模块；重写功能需求 FR-01～FR-25、非功能需求、业务流程、接口、数据需求与验收标准；登记当前未决项与负责人；与 v1.3 的差异集中记录于 1.2 |
+| v2.0-r1 | 2026-11-18 | 李昕彤 | 同步 ADR-004：Paper 发布/关闭改为 qbank 受控命令；新增 `PAPER_NOT_DRAFT`、Q-1、DC-15 与跨模块命令说明 |
 
 ### 10.5 文档维护任务
 

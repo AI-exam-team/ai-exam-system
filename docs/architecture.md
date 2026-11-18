@@ -96,7 +96,7 @@ qbank  ◄──── exam  ◄──── grading
 
 | 消费方 | 被依赖方 | 用途 | 约束 |
 | --- | --- | --- | --- |
-| `exam` | `qbank` | 读取 `DRAFT/PUBLISHED` 试卷、题目分值 | 只读，不修改题目与评分点 |
+| `exam` | `qbank` | 读取 `DRAFT/PUBLISHED` 试卷、题目分值；调用 Paper 生命周期受控命令 | 默认只读；`markPublished` / `markClosed` 是唯一受控写命令，不直接写表（ADR-004） |
 | `grading` | `exam` | 读取 `SUBMITTED` 答卷与答案 | 只读，不改变答案、提交方式与时间 |
 | `grading` | `qbank` | 读取题干、参考答案、评分点 | 只读，不重算评分点分值 |
 | 各模块 | `integration` | JWT 身份、统一错误码、`AIService` | 横切能力，不得反向依赖业务模块 |
@@ -105,14 +105,14 @@ qbank  ◄──── exam  ◄──── grading
 
 1. 单向依赖，禁止循环；`qbank` 不得依赖 `exam` 或 `grading`。
 2. 禁止展示层直连数据层。
-3. 禁止跨模块直接读写表；跨模块只走第 6 节的契约。
+3. 禁止跨模块直接读写表；跨模块默认只读。`Paper` 的发布/关闭是**唯一的受控写命令组**，由 qbank 实现、exam 调用（ADR-004）；除此之外，exam 不得写 qbank 任何表或字段。
 4. `integration` 是下层公共能力，不得依赖任何业务模块的服务层。
 5. 依赖方向变更必须先改本文件并新增 ADR。
 
 ### 4.2 循环依赖自查
 
 - [ ] `qbank` 无对 `exam` / `grading` 的 import 或 SQL。
-- [ ] `exam` 对 `qbank` 只有读接口调用。
+- [ ] `exam` 对 `qbank` 只有读接口 + `PaperLifecyclePort` 受控命令，无直接 SQL / Mapper。
 - [ ] `grading` 对 `exam` / `qbank` 只有读接口调用。
 - [ ] 没有通过共享表绕过依赖方向。
 
@@ -140,6 +140,7 @@ qbank  ◄──── exam  ◄──── grading
 | --- | --- | --- | --- | --- |
 | `VALIDATION_ERROR` | 400 | 通用参数校验失败（缺字段、类型错误、非法枚举） | integration / 各模块 | 待契约升版 |
 | `PAPER_NOT_FOUND` | 404 | 试卷不存在 | qbank / exam | 待契约升版 |
+| `PAPER_NOT_DRAFT` | 409 | 试卷当前状态不是 `DRAFT`（重复发布或已关闭） | qbank（经 exam 返回） | 待契约升版 |
 | `QUESTION_NOT_ACTIVE` | 409 | 组卷引用非 `ACTIVE` 题目 | qbank | 待契约升版 |
 | `QUESTION_ALREADY_USED` | 409 | 题目被任一 `PUBLISHED` 试卷引用，禁止修改 | qbank | 待契约升版 |
 | `ANSWER_NOT_SUBMITTED` | 409 | 对 `DRAFT` 答卷触发 AI 初评 | grading | 待契约升版 |
@@ -302,7 +303,7 @@ qbank  ◄──── exam  ◄──── grading
 1. **不接收** `totalScore`：由系统按各题 `Question.totalScore` 汇总，不接受手工填写。
 2. **不接收** 单题 `score`：`PaperItem.score` 必须等于题目 `totalScore`，组卷时不可改写。
 3. 保存结果固定为 `DRAFT`，**不写入** `startAt` / `endAt` / `publishedAt`（contract 2.3：发布时必填，由 `exam` 设置）。
-4. 组卷时按 ADR-001 在同一事务内写入**基线快照**（题干、参考答案、总分、评分点），供草稿阶段对比；发布时由 `exam` 只改 `Paper.status`，基线快照随 `PUBLISHED` 成为**正式快照**并冻结，`exam` 不调用 qbank 写接口。
+4. 组卷时按 ADR-001 在同一事务内写入**基线快照**（题干、参考答案、总分、评分点），供草稿阶段对比；发布时 `exam` 调用 qbank 的 `markPublished` 受控命令，qbank 完成 `DRAFT → PUBLISHED`、写入窗口并冻结正式快照；`exam` 不直接写 qbank 表（ADR-004）。
 5. 草稿快照对比见 6.2.7；具体快照行为待 ADR-001 评审通过后生效。
 
 **成功 201：`Paper`**（字段见 contract 2.3）
@@ -493,15 +494,30 @@ qbank  ◄──── exam  ◄──── grading
 
 ### 6.5 跨模块交接数据
 
-跨模块采用**进程内只读接口 + DTO**，不使用事件总线（MVP1 禁止消息队列）。
+跨模块采用**进程内只读接口 + DTO**，不使用事件总线（MVP1 禁止消息队列）。唯一例外是 Paper 生命周期的受控写命令（6.5.1，ADR-004）。
 
 | 方向 | 数据契约（逻辑字段） | 约束 |
 | --- | --- | --- |
-| qbank → exam | `PaperForExam { paperId, title, totalScore, items[{questionId, order, score, type, stem}], status }` | 不包含参考答案与评分点；`exam` 发布时重新校验分值；qbank 侧由 `paper_items` 快照组装，`DRAFT` 用基线快照，`PUBLISHED` / `CLOSED` 用冻结的正式快照（待 ADR-001 通过） |
+| qbank → exam | `PaperForExam { paperId, title, totalScore, status, startAt, endAt, publishedAt, createdBy, items[{questionId, order, score, type, stem}] }` | 不包含参考答案与评分点；`exam` 发布时重新校验分值；qbank 侧由 `paper_items` 快照组装，`DRAFT` 用基线快照，`PUBLISHED` / `CLOSED` 用冻结的正式快照（待 ADR-001 通过）；`createdBy` 仅供进程内归属校验，不返回学生端 |
 | qbank → grading | `QuestionForGrading { questionId, type, stem, referenceAnswer, totalScore, rubric[{rubricItemId, description, score, order}] }` | 只读；qbank 侧从快照组装；同一题在不同试卷可能是不同快照，按 `paperId` 定位（待 ADR-001 通过） |
 | exam → grading | `SubmittedSheetForGrading { answerSheetId, paperId, studentId, submittedAt, submitType, answers[{questionId, content}] }` | 仅 `SUBMITTED`；只读，不改变答案与时间 |
 | grading → 学生端 | `PublishedGrade { paperId, totalScore, items[{questionId, reviewedScore, reviewComment}] }` | 仅成绩发布后；不返回 `aiScore` / `aiReason` / `rubricHits` |
 | grading → 教师端 | `GradingSheetView { answerSheetId, items[{questionId, aiStatus, rubricHits, aiScore, aiReason, reviewedScore, reviewComment, reviewedAt}] }` | 仅试卷创建教师可见 |
+
+### 6.5.1 跨模块命令（受控写，ADR-004）
+
+| 命令 / 查询 | 提供方 | 调用方 | 语义 |
+| --- | --- | --- | --- |
+| `PaperLifecyclePort.markPublished(paperId, teacherId, startAt, endAt, publishedAt)` | qbank | exam | 校验归属、`DRAFT`、非空、总分、窗口；写状态与窗口并冻结基线快照；返回 `PaperForExam` |
+| `PaperLifecyclePort.markClosed(paperId)` | qbank | exam | 仅 `PUBLISHED → CLOSED`；已 `CLOSED` 按幂等处理 |
+| `PaperDueQueryPort.findDuePapers(now)` | qbank | exam | 只读返回 `status=PUBLISHED && endAt <= now` 的 `[{paperId, endAt}]`，供自动交卷按“到期试卷”扫描 |
+
+约束：
+
+1. `markPublished` / `markClosed` 是 exam 写 Paper 的**唯一入口**；`findDuePapers` 是只读查询。exam 不得直接 SQL / Mapper 操作 `papers`。
+2. `markPublished` 的校验失败由 qbank 返回领域错误，exam 映射为 6.3.1 的 `PAPER_NOT_FOUND` / `PAPER_NOT_DRAFT` / `EMPTY_PAPER` / `PAPER_SCORE_MISMATCH` / `INVALID_EXAM_WINDOW`。
+3. 自动交卷以 `findDuePapers` 为起点，先交卷再 `markClosed`；零答卷试卷也必须关闭。
+4. 端口是进程内调用，不新增 REST 端点；不在学生端暴露 `createdBy`。
 
 **契约字段冻结规则**：上述字段名一旦冻结，模块内部 DTO 可以不同，但跨模块边界必须使用契约字段；改名属于接口变更，需 ADR。
 
@@ -572,13 +588,15 @@ qbank  ◄──── exam  ◄──── grading
 | ADR | 主题 | 对应未决项 | 主笔 | 状态 |
 | --- | --- | --- | --- | --- |
 | ADR-001 | 已发布试卷取题目快照还是引用（基线快照 + 发布冻结） | C-01 | 孙宇萱（qbank） | 提议（待评审） |
-| ADR-002 | 交卷并发与自动交卷幂等 | C-03 | 钱斓轩（exam） | 待提交 |
+| ADR-002 | 交卷并发与自动交卷幂等 | C-03 | 钱斓轩（exam） | 提议（PR #34，待评审） |
 | ADR-003 | AI 初评调用、超时重试与幂等 | C-06 | 李昕彤 + grading | 本 PR 提交（提议） |
+| ADR-004 | Paper 发布/关闭的跨模块写路径（qbank 受控命令） | Q-1 | 李昕彤 | 提议（待 qbank / exam 评审） |
 
 仍在开放的问题：
 
 | 编号 | 问题 | 负责人 | 计划 |
 | --- | --- | --- | --- |
+| Q-1 | Paper 发布/关闭的跨模块写路径 | 李昕彤 + 孙宇萱 / 钱斓轩 | ADR-004（提议，待评审） |
 | C-02 | ID 格式（UUID / 雪花 / 自增） | 李昕彤 | 第 8 周 ADR 或架构附录 |
 | C-04 | AI 返回 JSON 物理字段与 schema | 王麒博 + 李昕彤 | 随 ADR-003 定稿 |
 | G-01 | 成绩发布是否必须等考试 `CLOSED` | 钱斓轩 + 左恩东 + 李昕彤 | 接口冻结前 |
