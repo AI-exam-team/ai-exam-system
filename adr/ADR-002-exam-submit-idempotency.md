@@ -82,50 +82,42 @@ UPDATE answer_sheets
 
 ### 4. 自动交卷：定时扫描为主，请求兜底为辅
 
-**主机制**：单实例 `@Scheduled(fixedDelay = 30_000)` 扫描到期答卷。扫描分两步，**不直接 JOIN qbank 的 `papers` 表**：
+**主机制**：单实例 `@Scheduled(fixedDelay = 30_000)` 调用 qbank 只读接口 `findDuePapers(now)` 枚举到期 `PUBLISHED` 试卷（**包括零答卷试卷**），对每张试卷：
 
-```sql
--- 步骤 1：只查 exam 自有表，取出待检查的答卷
-SELECT id, paper_id
-  FROM answer_sheets
- WHERE status = 'DRAFT'
- LIMIT 200;
+1. 查询该试卷下 `status='DRAFT'` 的答卷；
+2. 逐份执行第 2 条条件更新，参数：`submitted_at = paper.endAt`（**不是扫描时刻**，符合 AC-5 / contract 2.4），`submit_type='AUTO'`；
+3. 全部成功（或本来就没有 `DRAFT` 答卷）后，调用 qbank `markClosed(paperId)`。
 
--- 步骤 2：对去重后的 paper_id，调用 qbank 只读接口 PaperForExam，
---         取得 status / endAt；仅当 status='PUBLISHED' 且 endAt <= NOW()
---         时，对该 paper 下的 DRAFT 答卷执行第 2 条条件更新。
-```
+> `findDuePapers` 由 qbank 提供（Q-8），`markClosed` 由 qbank 提供（Q-1）；exam 不直接读 `papers` 表，也不直接 `UPDATE papers`。未裁决前，本节按受控命令描述，不作为可实现契约。
 
-> 跨模块读取走 `docs/architecture.md` 6.5 的 `PaperForExam`，不直接读 qbank 表（依赖规则 4.1 第 3 条）。MVP1 演示规模下按 `paper_id` 去重后逐张查询即可；若第 9 周实测 N+1 影响扫描时间，再评估「qbank 提供 `findDuePapers(now)` 只读接口」或「同库 JOIN 例外」，两者都需要 ADR 留痕（见 Q-6）。
+**兜底机制**：学生在 `endAt` 后调用保存/交卷接口时，先对本人 `DRAFT` 答卷执行同一条件更新：
 
-对每一份答卷执行第 2 条条件更新，参数为：
+- 兜底成功（或答卷已 `SUBMITTED`）→ 返回 `409 EXAM_ALREADY_SUBMITTED`；
+- 兜底未成功（仍为 `DRAFT`）→ 返回 `403 EXAM_CLOSED`。
 
-- `submitted_at = paper.endAt`（**不是扫描时刻**，符合 AC-5 / contract 2.4）；
-- `submit_type = 'AUTO'`。
+进入接口在窗口外仍返回 403，状态由 `GET /exams` 的 `answerSheetStatus` 展示。兜底不替代定时扫描，只覆盖「调度器短暂不可用 + 学生恰好访问」的场景。
 
-**兜底机制**：学生在 `endAt` 后调用进入、保存或交卷接口时，先对本人 `DRAFT` 答卷执行同一条件更新，再返回 `403 EXAM_CLOSED`。兜底不替代定时扫描，只覆盖「调度器短暂不可用 + 学生恰好访问」的场景。
-
-**为什么不只用惰性触发**：无人访问的答卷永远不会交卷，grading 无法开始；这不是可接受的失败模式。
+**为什么不只用惰性触发**：无人访问的答卷永远不会交卷，grading 无法开始；这不是可接受的失败模式。**为什么不只用惰性触发**：无人访问的答卷永远不会交卷，grading 无法开始；这不是可接受的失败模式。
 
 ### 5. 试卷关闭顺序
 
 到达 `endAt` 后，对每张试卷：
 
 1. 先完成该试卷所有 `DRAFT` 答卷的自动交卷；
-2. 全部成功（或本来就没有 `DRAFT` 答卷）后，再执行 `UPDATE papers SET status='CLOSED' WHERE id=? AND status='PUBLISHED'`；
+2. 全部成功（或本来就没有 `DRAFT` 答卷）后，调用 qbank `markClosed(paperId)`（受控命令，见 Q-1）；零答卷试卷由 `findDuePapers` 枚举，不依赖 `answer_sheets` 是否存在；
 3. 任一份失败则本轮不关闭该试卷，下一轮重试，避免 `CLOSED` 后无法再自动交卷。
 
-> 写路径待 Q-1 裁决：`Paper` 归 qbank，exam 不能直接跨模块改表；见 `docs/architecture.md` 6.3.1 与 6.3.10。
+> 写路径待 Q-1 裁决：`Paper` 归 qbank，exam 不能直接跨模块改表；集成侧拟新增 ADR-004 明确 `markPublished` / `markClosed`。见 `docs/architecture.md` 6.3.1 与 6.3.10。
 
 ### 6. 并发结果矩阵
 
 | 场景 | 结果 |
 | --- | --- |
 | 手动交卷 vs 手动交卷（双击/重试） | 一方 200；另一方条件更新 0 行 → 409 `EXAM_ALREADY_SUBMITTED`；答案与 `submittedAt` 不变 |
-| 手动交卷 vs 自动交卷 | 先执行条件更新者成功；另一方 0 行 → 手动返回 409（若窗口检查已过 `endAt` 则返回 403），自动静默跳过并记日志 |
+| 手动交卷 vs 自动交卷 | 先执行条件更新者成功；另一方 0 行 → 手动返回 409（兜底成功/已交卷）或 403（兜底未成功），自动静默跳过并记日志 |
 | 自动交卷 vs 自动交卷（扫描重叠） | 条件更新保证只有一次迁移；使用 `fixedDelay` 而非 `fixedRate`，单实例下不重叠 |
 | 首次进入 vs 首次进入 | 唯一约束一方成功；另一方重新读取并返回已有答卷（200） |
-| 手动交卷请求已过窗口 | 条件更新前返回 403 `EXAM_CLOSED`；由自动交卷接管，使用最后成功保存的答案 |
+| 手动交卷请求已过窗口 | 先执行兜底条件更新：成功返回 409 `EXAM_ALREADY_SUBMITTED`；未成功返回 403 `EXAM_CLOSED`；定时扫描继续接管，使用最后成功保存的答案 |
 
 ### 7. 错误码
 
@@ -151,6 +143,8 @@ SELECT id, paper_id
 | --- | --- | --- | --- |
 | SP-02 | MySQL 8.0.37 / REPEATABLE-READ / 50 线程 | C 方案 10 轮 × 50 并发：每轮 1 成功 / 49 冲突 / 1 行；A 仅唯一约束时无条件 `UPDATE` 2/2 成功；B 仅条件更新时并发插入 2 行；手动 vs 自动 1 成功 / 1 冲突，`AUTO` 未被覆盖；回滚后答案无残留 | 可行；唯一约束 + 条件更新缺一不可 |
 | SP-03 | MySQL 8.0.37 / 单实例 `ScheduledExecutorService` / 30s 扫描 | A 10/10，最大触发延迟 10.1s；B 5/10，5 份仍 `DRAFT`；C 10/10，0 重复；重启首轮 10/10 补齐 | 可行；采用定时扫描 + 请求兜底 |
+
+> SP-03 覆盖的是「有 `DRAFT` 答卷的试卷」的触发方式与漂移；**零答卷试卷关闭**由 `findDuePapers(now)` 枚举实现，SP-03 未覆盖，第 10 周补「零答卷 → CLOSED」测试。
 
 ## 备选方案
 
@@ -188,11 +182,12 @@ SELECT id, paper_id
 - [x] SP-02：执行 50 并发 × 10 轮实验，回填成功/冲突/行数/`submitted_at` 数据（钱斓轩）。
 - [x] SP-03：执行三种触发方案对比，回填扫描间隔与漂移结论（钱斓轩主、李昕彤复核）。
 - [ ] 契约 v0.2：登记 `VALIDATION_ERROR`；决定 `PAPER_NOT_DRAFT` 是否入表（集成负责人）。
-- [ ] Q-1：裁决 `Paper` 发布/关闭写路径；同步 `architecture.md` 6.3.1 / 6.3.8（李昕彤 + qbank）。
+- [ ] Q-1：裁决 `Paper` 发布/关闭写路径；建议 qbank `markPublished` / `markClosed` 受控命令 + 集成侧 ADR-004；同步 `architecture.md` 6.3.1 / 6.3.8（李昕彤 + qbank）。
 - [ ] Q-2：G-01 若要求 `CLOSED` 后才能发布成绩，补 `ExamProgressForGrading` DTO（李昕彤 + 左恩东）。
-- [ ] Q-6：自动交卷扫描读取 `Paper.status/endAt` 走 qbank 只读接口；若改为同库 JOIN，先补 ADR 例外（李昕彤 + 钱斓轩）。
-- [ ] Q-7：6.5 `PaperForExam` 补 `startAt` / `endAt` / `publishedAt` / `createdBy`，否则自动交卷无法判断窗口（李昕彤 + qbank）。
-- [ ] 第 10 周测试：唯一约束、条件更新 0 行回滚、手动/自动并发、重启补扫、窗口边界。
+- [ ] Q-6：自动交卷扫描改为 qbank `findDuePapers(now)`；若仍做同库 JOIN，先补 ADR 例外（李昕彤 + 钱斓轩）。
+- [ ] Q-7：6.5 `PaperForExam` 补 `startAt` / `endAt` / `publishedAt` / `createdBy`，否则自动交卷无法判断窗口（李昕彤补 6.5，qbank 确认）。
+- [ ] Q-8：qbank 提供 `findDuePapers(now)` 枚举到期试卷（含零答卷）；第 10 周补「零答卷 → CLOSED」测试（李昕彤 + qbank）。
+- [ ] 第 10 周测试：唯一约束、条件更新 0 行回滚、手动/自动并发、重启补扫、窗口边界、零答卷试卷关闭、兜底后 409。
 - [ ] 若 SP-02/SP-03 结论推翻假设，另起 ADR 替代本决策，并在本文件标注「被 ADR-XXXX 替代」。
 
 ## 关联需求 / Issue

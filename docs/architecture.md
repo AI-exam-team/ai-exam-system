@@ -492,7 +492,7 @@ qbank  ◄──── exam  ◄──── grading
 
 | 字段 | 类型 | 必填 | 约束与依据 |
 | --- | --- | --- | --- |
-| `startAt` | datetime | 是 | ISO-8601 带时区；发布时不得早于当前服务端时间（FR-1 / R3） |
+| `startAt` | datetime | 是 | ISO-8601 带时区；必须早于 `endAt`；允许早于当前时间（立即开始/已开始），只要 `endAt` 未过期（FR-1 / R3） |
 | `endAt` | datetime | 是 | ISO-8601 带时区；必须晚于 `startAt`，且发布时未过期（FR-1 / R3） |
 
 身份来源：JWT `role=TEACHER`；试卷 `createdBy` 必须等于 JWT `subject`，不接受请求体传入教师 ID。
@@ -527,7 +527,7 @@ qbank  ◄──── exam  ◄──── grading
 
 **对应 AC**：`module-02-exam.md` AC-1 / AC-8；FR-1、FR-2。
 
-> **跨模块待确认 Q-1**：`Paper` 由 qbank 产生，但发布需要写 `status` / `startAt` / `endAt` / `publishedAt`。6.2.4 又要求 exam 发布时“只改 `Paper.status`、不调用 qbank 写接口”，与“跨模块只读”的依赖规则冲突。需集成负责人 + qbank 在契约层二选一：① qbank 暴露受控的 `markPublished(paperId, startAt, endAt, publishedAt)` 写接口；② 发布字段迁到 exam 自有表（会改变“一份试卷即一场考试”的契约）。本接口暂按①描述，未裁决前不写实现。
+> **跨模块待确认 Q-1（阻塞）**：`Paper` 由 qbank 产生，发布/关闭需要写 `status` / `startAt` / `endAt` / `publishedAt`，但 4.1 规定 exam→qbank 只读，ADR-001 又写“只改 `Paper.status`”，三者冲突。集成侧建议：qbank 提供受控命令 `markPublished(paperId, startAt, endAt, publishedAt)` / `markClosed(paperId)`，exam 只调用命令，不直接写 `Paper` 表；集成侧补 ADR-004。未裁决前，6.3.1 / 6.3.8 只作为契约提案，**不写成可直接实现**。
 
 #### 6.3.2 GET /api/v1/exams?status=AVAILABLE — 学生可见考试列表
 
@@ -537,7 +537,7 @@ qbank  ◄──── exam  ◄──── grading
 | --- | --- | --- | --- | --- |
 | `status` | query | enum | 否 | 默认 `AVAILABLE`；MVP1 仅允许 `AVAILABLE`（已发布且当前在 `[startAt, endAt)` 内） |
 
-身份来源：JWT `role=STUDENT`；只返回与当前学生相关的可见考试，不接受 `studentId` 查询参数。
+身份来源：JWT `role=STUDENT`；返回所有 `PUBLISHED` 且当前在 `[startAt, endAt)` 内的考试。MVP1 无参与名单，不按学生过滤，也不接受 `studentId` 查询参数；`answerSheetStatus` 只取当前学生本人的答卷状态。
 
 **成功 200：`ExamSummary[]`**
 
@@ -630,7 +630,7 @@ qbank  ◄──── exam  ◄──── grading
 | 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
 | 403 | `FORBIDDEN` | 角色不是学生 | contract 第 6 节 |
 | 403 | `EXAM_NOT_STARTED` | 当前服务端时间早于 `startAt` | contract 第 5 节 / AC-7 |
-| 403 | `EXAM_CLOSED` | 当前服务端时间到达或超过 `endAt`（即使已有答卷，也不再通过本接口进入） | contract 第 5 节 / AC-7 |
+| 403 | `EXAM_CLOSED` | 当前服务端时间到达或超过 `endAt`；即使兜底已把答卷置为 `SUBMITTED`，进入接口仍返回 403，状态由 6.3.2 的 `answerSheetStatus` 展示 | contract 第 5 节 / AC-7 |
 | 404 | `PAPER_NOT_FOUND`（待登记） | 试卷不存在或不是 `PUBLISHED` | 5.1 表 |
 
 **权限**：仅学生本人；`(paperId, studentId)` 由数据库唯一约束保证最多一份答卷（R4）。并发首次进入时，唯一约束冲突的一方重新读取并返回已有答卷，不产生第二份。已交卷学生在窗口内重复进入返回 200；窗口外不再通过本接口进入，状态由 6.3.2 的 `answerSheetStatus` 展示。
@@ -668,11 +668,11 @@ qbank  ◄──── exam  ◄──── grading
 | 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
 | 403 | `FORBIDDEN` | 角色不是学生；或答卷 `studentId` ≠ JWT `subject` | contract 第 5、6 节 |
 | 403 | `EXAM_NOT_STARTED` | 当前服务端时间早于 `startAt` | contract 第 5 节 / AC-7 |
-| 403 | `EXAM_CLOSED` | 当前服务端时间到达或超过 `endAt`，且答卷仍为 `DRAFT` | contract 第 5 节 / AC-7 |
+| 403 | `EXAM_CLOSED` | 当前服务端时间到达或超过 `endAt`，兜底自动交卷未成功、答卷仍为 `DRAFT` | contract 第 5 节 / AC-7 |
 | 404 | `ANSWER_SHEET_NOT_FOUND` | `id` 不存在 | contract 第 5 节 |
-| 409 | `EXAM_ALREADY_SUBMITTED` | 答卷已为 `SUBMITTED`（只读） | contract 第 5 节 / AC-6 |
+| 409 | `EXAM_ALREADY_SUBMITTED` | 答卷已为 `SUBMITTED`（只读），包括请求兜底刚刚完成 | contract 第 5 节 / AC-6 |
 
-**检查顺序**：鉴权 → 答卷存在 → 归属 → 已交卷（409）→ 时间窗口（403）→ 请求体校验 → 按题覆盖。先判已交卷可以让重复保存/重试得到稳定的 409，而不是随窗口变化。
+**检查顺序**：鉴权 → 答卷存在 → 归属 → 若已到 `endAt` 先执行兜底自动交卷 → 重新读取状态 → 已交卷（409）→ 未交卷且已过窗口（403）→ 请求体校验 → 按题覆盖。兜底成功后返回 409 `EXAM_ALREADY_SUBMITTED`；兜底未成功（仍为 `DRAFT`）才返回 403 `EXAM_CLOSED`。
 
 **权限**：仅学生本人；教师不可写学生答卷。
 
@@ -709,9 +709,11 @@ qbank  ◄──── exam  ◄──── grading
 | 401 | `UNAUTHORIZED` | 未携带 JWT 或 JWT 失效 | contract 第 5 节 |
 | 403 | `FORBIDDEN` | 角色不是学生；或答卷 `studentId` ≠ JWT `subject` | contract 第 5、6 节 |
 | 403 | `EXAM_NOT_STARTED` | 当前服务端时间早于 `startAt` | contract 第 5 节 / AC-7 |
-| 403 | `EXAM_CLOSED` | 当前服务端时间到达或超过 `endAt`，且答卷仍为 `DRAFT`（由自动交卷接管） | contract 第 5 节 / AC-7 |
+| 403 | `EXAM_CLOSED` | 当前服务端时间到达或超过 `endAt`，兜底自动交卷未成功、答卷仍为 `DRAFT`（由定时扫描继续接管） | contract 第 5 节 / AC-7 |
 | 404 | `ANSWER_SHEET_NOT_FOUND` | `id` 不存在 | contract 第 5 节 |
-| 409 | `EXAM_ALREADY_SUBMITTED` | 答卷已为 `SUBMITTED`（重复点击、网络重试、自动交卷已先完成） | contract 第 5 节 / AC-6 |
+| 409 | `EXAM_ALREADY_SUBMITTED` | 答卷已为 `SUBMITTED`（重复点击、网络重试、自动交卷已先完成，或请求兜底刚刚完成） | contract 第 5 节 / AC-6 |
+
+**检查顺序**：鉴权 → 答卷存在 → 归属 → 若已到 `endAt` 先执行兜底自动交卷 → 重新读取状态 → 已交卷（409）→ 未交卷且已过窗口（403）→ 请求体校验 → 事务。
 
 **事务与幂等**（详见 ADR-002）：
 
@@ -771,18 +773,18 @@ qbank  ◄──── exam  ◄──── grading
 
 | 项 | 确认结果 |
 | --- | --- |
-| 主触发 | 单实例 `@Scheduled(fixedDelay = 30s)` 扫描 exam 自有 `answer_sheets` 中 `status='DRAFT'` 的答卷；对去重后的 `paperId` 走 qbank 只读接口 `PaperForExam` 取 `status/endAt`，仅对 `PUBLISHED` 且 `endAt <= now` 的执行条件更新（**不直接 JOIN qbank 表**） |
-| 兜底触发 | 学生在 `endAt` 后调用进入/保存/交卷时，先对本人 `DRAFT` 答卷执行同一条件更新，再返回 `EXAM_CLOSED`；不单独依赖惰性触发（无人访问会漏交） |
+| 主触发 | 单实例 `@Scheduled(fixedDelay = 30s)` 调用 qbank 只读接口 `findDuePapers(now)` 枚举到期 `PUBLISHED` 试卷（**含零答卷试卷**）；对每张试卷下的 `DRAFT` 答卷执行条件更新，再调用 qbank `markClosed(paperId)`。不直接 JOIN qbank 表，也不只从 `answer_sheets` 出发 |
+| 兜底触发 | 学生在 `endAt` 后调用保存/交卷时，先对本人 `DRAFT` 答卷执行同一条件更新：兜底成功返回 **409 `EXAM_ALREADY_SUBMITTED`**，兜底未成功才返回 **403 `EXAM_CLOSED`**。进入接口仍返回 403，状态由 6.3.2 展示。不单独依赖惰性触发（无人访问会漏交） |
 | 状态迁移 | 条件更新 `WHERE status='DRAFT'`；每份答卷最多一次 `DRAFT → SUBMITTED` |
 | 时间字段 | `submitType='AUTO'`；`submittedAt = papers.endAt`（不是扫描时刻，符合 AC-5 / contract 2.4） |
 | 答案来源 | 以最后一次成功保存的答案为准；未保存内容不阻塞交卷（FR-6） |
 | 重启补偿 | 进程重启后首轮扫描自动补齐；无需补偿表 |
-| 试卷关闭 | 到达 `endAt` 后，先完成该试卷所有 `DRAFT` 答卷的自动交卷，再条件更新 `PUBLISHED → CLOSED`；仍有失败则本轮不关闭，下一轮重试（写路径见 Q-1） |
+| 试卷关闭 | 到达 `endAt` 后，先完成该试卷所有 `DRAFT` 答卷的自动交卷，再调用 qbank `markClosed(paperId)`（受控命令）；零答卷试卷也会被 `findDuePapers` 枚举并关闭；仍有失败则本轮不关闭，下一轮重试（写路径见 Q-1） |
 | 失败处理 | 单份失败记录日志并在下一轮重试；不因一份失败阻塞其他答卷；连续失败升级人工 |
-| 参数待验证 | 扫描间隔 30s、单批上限 200 份、`endAt + 60s` 内完成率，由 SP-03 回填；不达标则调整间隔或改为更短周期 |
+| 参数（已回填） | 扫描间隔 30s、单批上限 200 份；SP-03 实测 10/10 在 10.1s 内完成、0 重复；零答卷关闭未覆盖，第 10 周补测试 |
 
-> 扫描实现不得直接读取 qbank 的 `papers` 表；跨模块读取走 6.5 `PaperForExam`。若第 9 周为性能需要同库 JOIN，先补 ADR 例外（Q-6）。
-> 当前 `PaperForExam` 还缺 `endAt` / `createdBy`，见 Q-7；补齐前 6.3.8 的扫描只能停留在逻辑描述。
+> 扫描入口改为 qbank `findDuePapers(now)`，不再只从 `answer_sheets` 出发；这样零答卷试卷也会被关闭。跨模块不直接读 `papers` 表（Q-6 / Q-8）。
+> `PaperForExam` 需补 `startAt` / `endAt` / `publishedAt` / `createdBy`（Q-7）；`findDuePapers` 由 qbank 提供（Q-8）。两项到位前，6.3.8 只作为契约描述。
 > **SP-02/SP-03 实测（2026-11-18）**：50 并发 × 10 轮每轮 1 次迁移；30s 扫描 + 惰性兜底 10/10，最大触发延迟 10.1s，0 重复；仅惰性 5/10 漏交。
 
 #### 6.3.9 数据流与风险
@@ -791,8 +793,8 @@ qbank  ◄──── exam  ◄──── grading
 
 ```text
 教师登录（integration，JWT role=TEACHER）
-  → POST /papers/{id}/publish：归属 → 状态 DRAFT → 非空 → 总分一致 → startAt < endAt 且未过期
-      → Paper: DRAFT → PUBLISHED，publishedAt 为服务端时间
+  → POST /papers/{id}/publish：归属 → 状态 DRAFT → 非空 → 总分一致 → startAt < endAt 且 endAt 未过期
+      → 调用 qbank markPublished(...) → Paper: DRAFT → PUBLISHED，publishedAt 为服务端时间
 学生登录（JWT role=STUDENT）
   → GET /exams?status=AVAILABLE：只返回 PUBLISHED 且当前在窗口内的考试
   → GET /exams/{paperId}：返回题干与 serverTime，不下发评分点/参考答案
@@ -801,8 +803,9 @@ qbank  ◄──── exam  ◄──── grading
   → POST /answer-sheets/{id}/submit：全量答案 + 条件更新 DRAFT → SUBMITTED（MANUAL）
   → grading 通过 SubmittedSheetForGrading 只读消费（仅 SUBMITTED）
 到 endAt：
+  → findDuePapers(now) 枚举到期 PUBLISHED 试卷（含零答卷）
   → 定时扫描（或学生请求兜底）条件更新 DRAFT → SUBMITTED（AUTO，submittedAt=endAt）
-  → 该试卷全部答卷 SUBMITTED 后 PUBLISHED → CLOSED
+  → 全部成功（或零答卷）后调用 qbank markClosed(paperId)：PUBLISHED → CLOSED
 ```
 
 **失败路径与不变式**
@@ -843,13 +846,14 @@ qbank  ◄──── exam  ◄──── grading
 
 | 编号 | 问题 | 影响 | 建议 |
 | --- | --- | --- | --- |
-| Q-1 | `Paper` 的发布/关闭写路径：qbank 受控写接口，还是 exam 自有表？ | 6.3.1 / 6.3.8 无法落地实现 | 李昕彤 + qbank 在契约层定；未定前不写实现 |
+| Q-1 | `Paper` 发布/关闭写路径：qbank `markPublished` / `markClosed` 受控命令（建议），还是 exam 自有表？ | 6.3.1 / 6.3.8 **阻塞** | 集成侧补 ADR-004；qbank 提供命令；未裁决前 6.3.1/6.3.8 不作为可实现契约 |
 | Q-2 | G-01 是否要求试卷 `CLOSED` 后才能发布成绩？ | 决定是否需要 `ExamProgressForGrading` DTO | 李昕彤 + 左恩东在接口冻结前定 |
 | Q-3 | `PAPER_NOT_DRAFT` 是否登记为正式错误码？ | 发布重复点击的行为 | 集成负责人在 5.1 登记；登记前按提案名使用 |
 | Q-4 | 答案 `content` 长度上限 | 保存/交卷校验与 DB 字段 | SP-04 结论回填；暂定 20,000 字符 |
-| Q-5 | 自动交卷扫描间隔与漂移 | `endAt + 60s` 完成率 | SP-03 回填 ADR-002；暂定 30s / 单批 200 |
-| Q-6 | 自动交卷扫描读取 `papers.status/end_at` 的实现路径 | 影响扫描性能与依赖合规 | 优先 qbank 只读接口；同库 JOIN 需 ADR 例外 |
-| Q-7 | 6.5 的 `PaperForExam` 缺少 `startAt` / `endAt` / `publishedAt` / `createdBy` | exam 无法做窗口控制、自动交卷与归属校验 | qbank + 集成负责人在 6.5 补齐字段；跨模块 DTO 变更走 ADR |
+| Q-5 | 自动交卷扫描间隔与漂移 | `endAt + 60s` 完成率 | 已由 SP-03 回填：30s / 单批 200，10/10 在 10.1s 内 |
+| Q-6 | 自动交卷扫描读取 `papers.status/end_at` 的实现路径 | 影响扫描性能与依赖合规 | 改为 qbank `findDuePapers(now)`；若仍做同库 JOIN 需 ADR 例外 |
+| Q-7 | 6.5 的 `PaperForExam` 缺少 `startAt` / `endAt` / `publishedAt` / `createdBy` | exam 无法做窗口控制、自动交卷与归属校验 | 李昕彤补 6.5，qbank 确认；跨模块 DTO 变更走 ADR |
+| Q-8 | qbank 需要提供 `findDuePapers(now)` 只读枚举 | 零答卷试卷永远不会 `CLOSED` | 李昕彤 + qbank 在 6.5/契约补接口；第 10 周补「零答卷 → CLOSED」测试 |
 
 ### 6.4 AI 阅卷与复核（grading）
 
