@@ -70,7 +70,7 @@ docs/spike/spike-<topic>/
 | --- | --- | --- | --- | --- | --- |
 | SP-01 | DeepSeek 结构化评分输出、延迟与费用 | `docs/spike/spike-deepseek-grading/` | 主执行 左恩东 / 复核 王麒博 | 计划中 | - |
 | SP-02 | MySQL 并发交卷幂等 | `docs/spike/spike-mysql-submit-idempotency/` | 主执行 钱斓轩 / 复核 李昕彤 | 已完成 | 可行：唯一约束+条件更新；50 并发×10 轮每轮 1 成功/49 冲突 |
-| SP-03 | 自动交卷触发方式与调度漂移 | `docs/spike/spike-auto-submit-trigger/` | 主执行 钱斓轩 / 复核 李昕彤 | 已完成 | 可行：30s 定时+惰性兜底；10/10，0 重复；仅惰性 5/10 漏交 |
+| SP-03 | 自动交卷触发方式与调度漂移 | `docs/spike/spike-auto-submit-trigger/` | 主执行 钱斓轩 / 复核 李昕彤 | 已完成 | 可行：30s 定时+惰性兜底；10/10，0 重复；仅惰性 5/10 漏交；零答卷关闭待第 10 周 |
 | SP-04 | 长文本答案与 utf8mb4 存储 | `docs/spike/spike-mysql-text-storage/` | 主执行 周裔 / 复核 孙宇萱 | 有条件可行（待 MySQL 8 重跑） | SQL Server 初步；MySQL 待验证 |
 
 > 认领日期：2026-11-18。SP-02、SP-03 均为 主执行 钱斓轩 / 复核 李昕彤。同一探针目录只由主执行修改，复核人只看 diff 与证据。
