@@ -7,13 +7,13 @@
 | 日期 | 2026-11-17 |
 | 负责人 | 李昕彤（集成与契约） |
 | 关联任务 | 第 8 周 SRS 更新 |
-| 依据 | `context.md` v0.1；`spec/mvp1-scope.md` v0.1；`spec/contract-v0.1.md`；`spec/module-01-qbank.md` v0.2；`spec/module-02-exam.md` v0.2；`spec/module-03-grading.md` v0.2（评审中）；`docs/architecture.md` v0.1（第 8 周架构 PR）；`adr/ADR-003`（提议，随第 8 周架构 PR 合入） |
+| 依据 | `context.md` v0.1；`spec/mvp1-scope.md` v0.1；`spec/contract-v0.1.md`；`spec/module-01-qbank.md` v0.2；`spec/module-02-exam.md` v0.2；`spec/module-03-grading.md` v0.2（评审中）；`docs/architecture.md` v0.1（第 8 周架构 PR）；`adr/ADR-001-qbank-snapshot.md`（提议）；`adr/ADR-003`（提议，随第 8 周架构 PR 合入） |
 | 历史版本 | `docs/reference/AI智能考试系统_SRS_v1.3_架构导读优化稿.docx`（只读归档，仅作参考） |
 
 > **文档定位**：本文件是第 8 周的需求汇总视图，替代 v1.3 作为团队当前需求基线。
 > 发现冲突时，优先级为：`context.md` → `spec/` → 本文件 → `docs/reference/` 中的 v1.3。
 > 本文件不写生产代码；模块内部实现细节、类名与数据库物理表结构不在本文冻结范围。
-> **合入顺序**：本文件引用第 8 周架构产出（`docs/architecture.md`、ADR-003），应在该 PR 合入后再合并；在该 PR 合入前，相关路径可能尚不存在。
+> **合入顺序**：本文件引用第 8 周架构产出（`docs/architecture.md`、ADR-003）以及 ADR-001（提议）；应在对应 PR 合入后再合并；在合入前，相关路径可能尚不存在。
 
 ---
 
@@ -233,7 +233,9 @@ grading（AI 建议分 → 教师复核 → 成绩发布）
 | 编号 | 需求 | 角色 | 主流程与规则 | 异常 / 错误码 |
 | --- | --- | --- | --- | --- |
 | FR-08 | 组卷 | 教师 | 从本人 `ACTIVE` 题目中选题；维护顺序；单题分值继承题目 `totalScore`，组卷时不可修改；保存为 `DRAFT` | 使用非 `ACTIVE` 题目 409；分值不一致 409 `PAPER_SCORE_MISMATCH` |
-| FR-09 | 试卷草稿与总分校验 | 教师 | 试卷至少 1 题；`totalScore` 等于各题分值之和；本阶段不设置 `startAt/endAt`，由 exam 发布时设置 | 空试卷 409 `EMPTY_PAPER`；总分不一致 409 `PAPER_SCORE_MISMATCH` |
+| FR-09 | 试卷草稿与总分校验 | 教师 | 试卷至少 1 题；`totalScore` 等于各题分值之和；本阶段不设置 `startAt/endAt`，由 exam 发布时设置；组卷时保存基线快照 | 空试卷 409 `EMPTY_PAPER`；总分不一致 409 `PAPER_SCORE_MISMATCH` |
+
+> **快照补充（ADR-001 提议）**：草稿阶段提供只读对比接口（前端第 10 周实现），用于查看组卷时的基线快照与当前题目差异；发布时基线快照随 `Paper.status=PUBLISHED` 冻结为正式快照。评审通过前不作为已冻结需求。
 
 ### 3.4 考试发布（exam）
 
@@ -494,6 +496,10 @@ AI 超时 / 非法 JSON / 评分点不匹配 / 分数越界
 | `AI_SCORE_OUT_OF_RANGE` | 502 | AI 分数越界 | grading | 已确定 |
 | `GRADE_NOT_FULLY_REVIEWED` | 409 | 未完成整场复核即发布成绩 | grading | 已确定 |
 | `SCORE_NOT_PUBLISHED` | 403 | 成绩未发布，学生查询 | grading | 已确定 |
+| `VALIDATION_ERROR` | 400 | 通用参数校验失败（缺字段、类型错误、非法枚举） | integration / 各模块 | 待契约 v0.2 |
+| `PAPER_NOT_FOUND` | 404 | 试卷不存在 | qbank / exam | 待契约 v0.2 |
+| `QUESTION_NOT_ACTIVE` | 409 | 组卷引用非 `ACTIVE` 题目 | qbank | 待契约 v0.2 |
+| `QUESTION_ALREADY_USED` | 409 | 题目被任一 `PUBLISHED` 试卷引用，禁止修改 | qbank | 待契约 v0.2 |
 | `ANSWER_NOT_SUBMITTED` | 409 | 对草稿答卷触发 AI 初评 | grading | 待契约 v0.2 |
 | `AI_GRADING_IN_PROGRESS` | 409 | 同一题初评处于 `PENDING` 时重复触发 | grading | 待契约 v0.2 |
 | `INVALID_REVIEWED_SCORE` | 400 | 确认分非整数或超出题目分值范围 | grading | 待契约 v0.2 |
@@ -511,7 +517,7 @@ AI 超时 / 非法 JSON / 评分点不匹配 / 分数越界
 | `Question` 题目 | 简答或论述题 | `id`、`type`、`stem`、`referenceAnswer`、`rubric[]`、`totalScore`、`status`、`createdBy`、时间戳 | qbank → qbank / grading |
 | `RubricItem` 评分点 | 可独立判定的得分要点 | `id`、`questionId`、`description`、`score`、`order` | qbank → grading |
 | `Paper` 试卷 | 一份试卷即一场考试 | `id`、`title`、`items[]`、`totalScore`、`status`、`startAt`、`endAt`、`publishedAt`、`createdBy` | qbank → exam |
-| `PaperItem` 组卷明细 | 试卷内题目顺序与分值 | `questionId`、`order`、`score`（等于题目总分） | qbank → exam |
+| `PaperItem` 组卷明细 | 试卷内题目顺序、分值与基线快照 | `questionId`、`order`、`score`（等于题目总分）；快照字段：`type`、`stem`、`referenceAnswer`、`totalScore`、`rubric[]`（待 ADR-001 通过） | qbank → exam |
 | `AnswerSheet` 答卷 | 一名学生的一次作答 | `id`、`paperId`、`studentId`、`answers[]`、`status`、`startedAt`、`submittedAt`、`submitType`、`finalScore` | exam → grading |
 | `Answer` 逐题答案 | 学生对某题的作答 | `questionId`、`content`、`savedAt` | exam → grading |
 | `GradeResult` 评分结果 | 一道题的 AI 与教师结果 | `id`、`answerSheetId`、`questionId`、`aiStatus`、`rubricHits[]`、`aiScore`、`aiReason`、`reviewedScore`、`reviewComment`、`reviewedBy`、`reviewedAt`、审计字段 | grading → 教师 / 学生 |
@@ -573,7 +579,8 @@ NOT_READY ──全部已提交答卷的每题均有 reviewedScore──► READ
 | DC-10 | 成绩发布前不得写入 `finalScore`；发布后 `finalScore` 等于各题 `reviewedScore` 之和 |
 | DC-11 | 成绩发布前学生不可见任何分值；发布后仅本人可见 |
 | DC-12 | 密码 BCrypt 存储；时间字段一律服务端生成 |
-| DC-13 | 已发布试卷的历史题目取值（快照或引用）由 C-01 / ADR-001 决定 |
+| DC-13 | 组卷时保存基线快照，发布时随 `Paper.status=PUBLISHED` 冻结为正式快照；下游只读快照（ADR-001 提议，待评审通过后生效） |
+| DC-14 | 题目被任一 `PUBLISHED` 试卷引用时禁止修改，返回 409 `QUESTION_ALREADY_USED`（锁题策略，待契约 v0.2 登记） |
 
 ### 7.4 权限与可见性
 
@@ -587,13 +594,13 @@ NOT_READY ──全部已提交答卷的每题均有 reviewedScore──► READ
 
 ### 7.5 数据版本与历史一致性
 
-已发布试卷的结构、分值与时间窗口不可修改。但题目本体与评分点是否允许修改、历史试卷与答卷取哪一版数据，仍待 **C-01 / ADR-001** 决定：
+已发布试卷的结构、分值与时间窗口不可修改。题目本体与评分点的历史取值由 **C-01 / ADR-001** 处理，当前提案为：
 
-- 方案 A：动态引用题目当前版本；
-- 方案 B：发布时保存题目快照；
-- 方案 C：版本号 + 历史查询。
+- **方案 A**：动态引用题目当前版本（不采用，历史会漂移）；
+- **方案 B（提议）**：组卷时保存基线快照，草稿阶段提供只读对比；发布时基线快照随 `Paper.status=PUBLISHED` 冻结为正式快照，下游只读快照；
+- **方案 C**：版本号 + 历史查询（属 v2，触碰 MVP1 Non-Goals）。
 
-在 ADR-001 决议前，任何实现不得默认其中一种作为已定需求。
+配套的锁题策略：题目被任一 `PUBLISHED` 试卷引用时禁止修改，返回 409 `QUESTION_ALREADY_USED`。ADR-001 通过前，任何实现不得把方案 B 或锁题策略当作已冻结需求；`architecture.md` 6.2 的相关行为同样标注为待决议。
 
 ---
 
@@ -706,7 +713,7 @@ NOT_READY ──全部已提交答卷的每题均有 reviewedScore──► READ
 
 | 编号 | 问题 | 影响 | 负责人 | 计划 / 依据 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| C-01 | 已发布试卷取题目快照还是动态引用？历史试卷、答卷、评分结果取哪一版？ | 题目修改后历史一致性 | 孙宇萱 + 李昕彤 | ADR-001 | 待决议 |
+| C-01 | 已发布试卷取题目快照还是动态引用？历史试卷、答卷、评分结果取哪一版？ | 题目修改后历史一致性 | 孙宇萱 + 李昕彤 | ADR-001（提议：基线快照 + 发布冻结） | 评审中 |
 | C-02 | ID 格式与生成方式（UUID / 雪花 / 自增） | 接口与数据库设计 | 李昕彤 | 第 8 周 ADR 或架构附录 | 待决议 |
 | C-03 | 交卷并发与自动交卷幂等的具体实现 | exam 实现与测试 | 钱斓轩 | ADR-002 | 待决议 |
 | C-04 | AI 输出 JSON 物理字段、校验 schema、同步/异步表达 | grading 接口冻结 | 王麒博 + 李昕彤 | ADR-003 / SP-01 | 待决议 |
@@ -768,7 +775,8 @@ NOT_READY ──全部已提交答卷的每题均有 reviewedScore──► READ
 7. `docs/architecture.md` v0.1（第 8 周架构 PR）— 模块边界、依赖、接口清单与数据流。
 8. `docs/dependency.md` v0.1（第 8 周架构 PR）— 依赖与风险分析。
 9. `adr/ADR-003-grading-ai-invocation-and-idempotency.md`（提议，随第 8 周架构 PR 合入）— AI 调用与幂等。
-10. `docs/reference/AI智能考试系统_SRS_v1.3_架构导读优化稿.docx` — 历史版本，仅作参考。
+10. `adr/ADR-001-qbank-snapshot.md`（提议）— 题目基线快照、发布冻结与锁题策略。
+11. `docs/reference/AI智能考试系统_SRS_v1.3_架构导读优化稿.docx` — 历史版本，仅作参考。
 
 ### 10.4 修订记录
 

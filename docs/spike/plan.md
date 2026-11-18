@@ -21,7 +21,7 @@
 | SP-01 | DeepSeek 结构化评分输出、延迟与费用 | 左恩东 / 王麒博 | 1 天 | `docs/spike/spike-deepseek-grading/` | ADR-003、grading 接口设计 |
 | SP-02 | MySQL 并发交卷幂等 | 钱斓轩 | 0.5 天 | `docs/spike/spike-mysql-submit-idempotency/` | ADR-002、exam 测试用例 |
 | SP-03 | 自动交卷触发方式与调度漂移 | 李昕彤 / 钱斓轩 | 0.5 天 | `docs/spike/spike-auto-submit-trigger/` | ADR-002、exam 实现方案 |
-| SP-04 | 长文本答案与 utf8mb4 存储 | 周裔（主执行） / 孙宇萱（复核） | 0.5 天 | docs/spike/spike-mysql-text-storage/ | qbank/exam 字段设计 |
+| SP-04 | 长文本答案与 utf8mb4 存储 | 周裔（主执行） / 孙宇萱（复核） | 0.5 天 | `docs/spike/spike-mysql-text-storage/` | qbank/exam 字段设计 |
 
 排期建议：SP-01 与 SP-02 并行先做（分别卡住 grading 与 exam 的接口设计），SP-03、SP-04 在周三前完成。
 
@@ -150,6 +150,7 @@
 **明确不做**：不做全文检索、不引入 Elasticsearch。
 
 > **认领记录**：主执行 周裔，复核 孙宇萱。认领日期：2026-11-17。关联 Issue：#29。
+> **当前状态**：现有证据来自 SQL Server，不是 MySQL 8；在 MySQL 8 + utf8mb4 重跑前，SP-04 结论为“有条件可行”，不能标记“已完成/可行”。
 
 ---
 
