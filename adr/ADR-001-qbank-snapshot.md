@@ -166,10 +166,10 @@
 
 | # | 待验证项 | 方式 | 结论去向 |
 | --- | --- | --- | --- |
-| 1 | 快照长文本（`stem` / `referenceAnswer` / `rubric` JSON）在 MySQL 8 + utf8mb4 下能否完整往返（含 emoji、换行、中文标点） | SP-04 | **已由 SP-04 验证**：通过 MySQL 8 实测，含中文字符与特殊符号的 26000 字符长文本成功存入 `MEDIUMTEXT`，长度校验（`CHAR_LENGTH`）无误。文本长度完整写入。终端显示 ??? 已通过 HEX() 底层十六进制验证（包含 F09F988A 等），证明 emoji 完整存储无截断。|
-| 2 | 20KB / 50KB 内容选 `TEXT` 还是 `MEDIUMTEXT` | SP-04 | **已确认选 `MEDIUMTEXT`**：对比测试表明，当插入 1000 次重复长文本时，`TEXT` 字段直接触发 `ERROR 1406: Data too long`；而较小的数据量可成功插入。据此冻结数据模型字段类型为 `MEDIUMTEXT`。 |
+| 1 | 快照长文本（`stem` / `referenceAnswer` / `rubric` JSON）在 MySQL 8 + utf8mb4 下能否完整往返（含 emoji、换行、中文标点） | SP-04 | **已由 SP-04 验证**：文本长度完整写入无截断。关于终端显示 `???` 的问题，已通过 `HEX()` 底层查询确证：文本尾部包含 `F09F988A`（😊 的 UTF-8 十六进制编码），证明 emoji 完整无损入库，显示异常纯属 Windows CMD 终端限制。 |
+| 2 | 20KB / 50KB 内容选 `TEXT` 还是 `MEDIUMTEXT` | SP-04 | **已确认选 `MEDIUMTEXT`**：实测 `TEXT` 字段存大文本会触发 `ERROR 1406: Data too long` 报错导致截断；`MEDIUMTEXT` 可成功存取。据此冻结数据模型字段类型。 |
 | 3 | 组卷深拷贝事务中途异常能否完整回滚（无半成品 `paper_items`） | 第 9 周集成测试 | 由 qbank 在第 9 周补验证，未验证前 R-01 标“待验证” |
-| 4 | `JSON` 快照列在 utf8mb4 下的字符保留 | SP-04（与 #1 同时验证） | 同 #1，字符长度无截断，终端显示受限，待第 9 周应用层复验。 |
+| 4 | `JSON` 快照列在 utf8mb4 下的字符保留 | SP-04（与 #1 同时验证） | **已由 SP-04 补测验证**：MySQL 8 原生 JSON 字段成功存取含中文及 emoji 的 JSON 数组，`JSON_EXTRACT` 解析正常，无乱码截断。 |
 
 > 验证完成后由本 ADR 主笔（孙宇萱）回写结论；探针代码只留 `docs/spike/spike-mysql-text-storage/`，不合并 `src/`。
 
