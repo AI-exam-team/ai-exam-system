@@ -21,7 +21,7 @@
   3. 通过 `SELECT HEX(content)` 查证，结果显示尾部编码为 **`F09F988A`**（即 😊 的标准 UTF-8 十六进制）。**证明 MySQL 8 在 utf8mb4 下已完整、无损地存储了 4 字节的 emoji，解决了“终端显示为 ???”的疑虑。**
 - **容量边界验证**：实测 `TEXT` 字段存 50KB 文本会触发 `ERROR 1406: Data too long`，正式确定快照字段选用 **`MEDIUMTEXT`**。
 - **字段设计建议**：对于题干快照（`stem`）、参考答案快照（`referenceAnswer`）、评分点 JSON 快照（`rubric`），**必须采用 `MEDIUMTEXT` 类型**；建议前端限制输入上限为 20000 字符。
-- - **JSON 快照字段补测**：额外创建了 `test_json` 表验证 MySQL 8 原生 `JSON` 类型。成功插入包含中文和评分数据的 JSON 数组，并使用 `JSON_EXTRACT(rubric_json, '$[0].description')` 成功解析出 `"答出核心概念"`。**结论**：完全支持 `ADR-001` 中要求的 `rubric_json_snapshot` 结构存取需求。（注：因本地 CMD 终端编码限制，该测试中 emoji 被终端转码为 `?`，但在 `MEDIUMTEXT` 测试中已通过 `HEX()` 底层证据证明 MySQL 支持 4 字节 emoji 存储）。
+- **JSON 快照字段补测**：额外创建了 `test_json` 表验证 MySQL 8 原生 `JSON` 类型。成功插入包含中文和评分数据的 JSON 数组，并使用 `JSON_EXTRACT(rubric_json, '$[0].description')` 成功解析出 `"答出核心概念"`。**结论**：完全支持 `ADR-001` 中要求的 `rubric_json_snapshot` 结构存取需求。（注：因本地 CMD 终端编码限制，该测试中 emoji 被终端转码为 `?`，但在 `MEDIUMTEXT` 测试中已通过 `HEX()` 底层证据证明 MySQL 支持 4 字节 emoji 存储）。
 - **验证截图**：
 <img width="529" height="41" alt="TEXT存20K成功" src="https://github.com/user-attachments/assets/b4c6e718-565c-4cfe-aadc-f170950943f6" />
 <img width="530" height="62" alt="TEXT存50K报错" src="https://github.com/user-attachments/assets/3f48d64d-4cef-48eb-a29b-30f218c63c5b" />
