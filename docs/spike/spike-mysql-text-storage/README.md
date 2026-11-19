@@ -14,17 +14,19 @@
 
 ## 4. 结论
 
-- **结论**：**可行（推荐 MEDIUMTEXT）**。
-- **实验步骤与证据说明**：
-  1. **小容量测试**：将 `REPEAT` 参数设为 300，写入 `TEXT` 字段时提示 `Query OK, 1 row affected`，证明 `TEXT` 字段承载短文本正常。
-  2. **容量边界测试**：将 `REPEAT` 参数设为 1000，尝试写入 `TEXT` 字段时，MySQL 直接报错 `ERROR 1406 (22001): Data too long for column 'content'`。这证明 `TEXT` 容量（约 65,535 字节）无法满足大体量答案存储需求。
-  3. **大容量（MEDIUMTEXT）测试**：同样的 1000 次循环长文本，成功写入 `MEDIUMTEXT` 字段。查询结果显示 `CHAR_LENGTH` 为 `26000`，数据未发生截断。
-  4. **字符完整性说明**：由于使用 MySQL CLI（CMD 终端）进行测试，终端编码不支持 emoji 显示，导致 `preview` 查出的表情变为 `???`。但 `CHAR_LENGTH` 统计与写入数据一致，表明数据库层面已完整存储；实际显示效果需第 9 周应用层（如网页前端）最终复验。
-- **字段设计建议**：对于题干快照（`stem`）、参考答案快照（`referenceAnswer`）、评分点 JSON 快照（`rubric`），**必须采用 `MEDIUMTEXT` 类型**。
+- **结论**：**可行**。MySQL 8 + utf8mb4 完全支持大容量中文及 4 字节 emoji 的存储。
+- **字符完整性（HEX 底层验证）**：
+  1. 由于本地 Windows CMD 终端使用 GBK 编码，直接粘贴包含 emoji 的 SQL 会触发 `ERROR 1366 (Incorrect string value)`。这属于终端传输限制，并非 MySQL 数据库限制。
+  2. 为绕过终端限制，实验采用 `CHAR(240, 159, 152, 138)` 在 MySQL 服务端直接生成 emoji（😊）并写入 `MEDIUMTEXT` 字段。
+  3. 通过 `SELECT HEX(content)` 查证，结果显示尾部编码为 **`F09F988A`**（即 😊 的标准 UTF-8 十六进制）。**证明 MySQL 8 在 utf8mb4 下已完整、无损地存储了 4 字节的 emoji，解决了“终端显示为 ???”的疑虑。**
+- **容量边界验证**：实测 `TEXT` 字段存 50KB 文本会触发 `ERROR 1406: Data too long`，正式确定快照字段选用 **`MEDIUMTEXT`**。
+- **字段设计建议**：对于题干快照（`stem`）、参考答案快照（`referenceAnswer`）、评分点 JSON 快照（`rubric`），**必须采用 `MEDIUMTEXT` 类型**；建议前端限制输入上限为 20000 字符。
 - **验证截图**：
 <img width="529" height="41" alt="TEXT存20K成功" src="https://github.com/user-attachments/assets/b4c6e718-565c-4cfe-aadc-f170950943f6" />
 <img width="530" height="62" alt="TEXT存50K报错" src="https://github.com/user-attachments/assets/3f48d64d-4cef-48eb-a29b-30f218c63c5b" />
 <img width="625" height="158" alt="存储表格显示" src="https://github.com/user-attachments/assets/c3184c90-aa2e-4c5e-b9b4-3ab3d1bdc428" />
+<img width="653" height="95" alt="表情的HEX编码" src="https://github.com/user-attachments/assets/93c2d71d-45d2-4365-aeb8-250931ff98bf" />
+
 
 
 
