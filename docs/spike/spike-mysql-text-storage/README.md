@@ -13,15 +13,23 @@
 3. 在接口层建议输入上限（与前端字数限制保持一致）。
 
 ## 4. 结论
-- **结论：有条件可行（待 MySQL 8 验证）**。
-- **环境说明**：当前证据来自 **SQL Server**（`NVARCHAR(MAX)`），只能作为“长文本需要大文本类型”的初步参考；**不能直接回答本探针的 MySQL 8 + utf8mb4 问题**。
-- **初步建议**：MySQL 侧优先使用 `MEDIUMTEXT`；`TEXT` 上限约 65,535 字节，20,000 个中文字符在 utf8mb4 下可能超出，必须在 MySQL 实测确认。
-- **字符完整性（初步）**：SQL Server 下包含中文、特殊符号及 emoji（😊📚）的长文本写入并读取后无乱码、无截断；该结果不能外推到 MySQL。
-- **待补实验（MySQL 8 + utf8mb4）**：
-  1. 建 utf8mb4 表，分别用 `TEXT` / `MEDIUMTEXT` 存 20KB、50KB 中文样本（含 emoji、换行）；
-  2. 记录写入结果、`CHAR_LENGTH()` / `LENGTH()`、读取一致性；
-  3. 验证 `JSON` 快照列（`rubric_json_snapshot`）的字符保留；
-  4. 复查通过后，再把状态改为“可行 / 不可行”。
-- **建议输入上限**：20000 字符仅为提案，需进契约/需求评审确认，不由本探针单独定案。
-- **现有证据（仅作参考）**：
-<img width="1075" height="542" alt="屏幕截图 2026-11-17 181204" src="https://github.com/user-attachments/assets/ded0ee7f-3b47-4d97-8184-5c2bcd34b589" />
+
+- **结论**：**可行**。MySQL 8 + utf8mb4 完全支持大容量中文及 4 字节 emoji 的存储。
+- **字符完整性（HEX 底层验证）**：
+  1. 由于本地 Windows CMD 终端使用 GBK 编码，直接粘贴包含 emoji 的 SQL 会触发 `ERROR 1366 (Incorrect string value)`。这属于终端传输限制，并非 MySQL 数据库限制。
+  2. 为绕过终端限制，实验采用 `CHAR(240, 159, 152, 138)` 在 MySQL 服务端直接生成 emoji（😊）并写入 `MEDIUMTEXT` 字段。
+  3. 通过 `SELECT HEX(content)` 查证，结果显示尾部编码为 **`F09F988A`**（即 😊 的标准 UTF-8 十六进制）。**证明 MySQL 8 在 utf8mb4 下已完整、无损地存储了 4 字节的 emoji，解决了“终端显示为 ???”的疑虑。**
+- **容量边界验证**：实测 `TEXT` 字段存 50KB 文本会触发 `ERROR 1406: Data too long`，正式确定快照字段选用 **`MEDIUMTEXT`**。
+- **字段设计建议**：对于题干快照（`stem`）、参考答案快照（`referenceAnswer`）、评分点 JSON 快照（`rubric`），**必须采用 `MEDIUMTEXT` 类型**；建议前端限制输入上限为 20000 字符。
+- **JSON 快照字段补测**：额外创建了 `test_json` 表验证 MySQL 8 原生 `JSON` 类型。成功插入包含中文和评分数据的 JSON 数组，并使用 `JSON_EXTRACT(rubric_json, '$[0].description')` 成功解析出 `"答出核心概念"`。**结论**：完全支持 `ADR-001` 中要求的 `rubric_json_snapshot` 结构存取需求。（注：因本地 CMD 终端编码限制，该测试中 emoji 被终端转码为 `?`，但在 `MEDIUMTEXT` 测试中已通过 `HEX()` 底层证据证明 MySQL 支持 4 字节 emoji 存储）。
+- **验证截图**：
+<img width="529" height="41" alt="TEXT存20K成功" src="https://github.com/user-attachments/assets/b4c6e718-565c-4cfe-aadc-f170950943f6" />
+<img width="530" height="62" alt="TEXT存50K报错" src="https://github.com/user-attachments/assets/3f48d64d-4cef-48eb-a29b-30f218c63c5b" />
+<img width="625" height="158" alt="存储表格显示" src="https://github.com/user-attachments/assets/c3184c90-aa2e-4c5e-b9b4-3ab3d1bdc428" />
+<img width="653" height="95" alt="表情的HEX编码" src="https://github.com/user-attachments/assets/93c2d71d-45d2-4365-aeb8-250931ff98bf" />
+<img width="902" height="241" alt="JSON" src="https://github.com/user-attachments/assets/31f19d6c-86f4-40b6-b177-cbfbe961fca0" />
+
+
+
+
+
