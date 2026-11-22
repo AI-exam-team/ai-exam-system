@@ -3,7 +3,7 @@
 | 项目 | 内容 |
 | --- | --- |
 | 版本 | v0.1 |
-| 状态 | 进行中（SP-02 / SP-03 已完成） |
+| 状态 | 进行中（SP-01 / SP-02 / SP-03 已完成） |
 | 日期 | 2026-11-17 |
 | 负责人 | 李昕彤（集成与契约） |
 | 依据 | `docs/spike/README.md`；`docs/architecture.md`；`docs/dependency.md`；ADR-003 |
@@ -32,6 +32,7 @@
 ## 2. SP-01 DeepSeek 结构化评分输出、延迟与费用
 
 认领记录：左恩东主执行，王麒博复核，2026-11-18，[Issue #33](https://github.com/AI-exam-team/ai-exam-system/issues/33)。
+> **当前状态**：已完成（2026-11-22）；结论「可行」，四项指标与费用明细见 `docs/spike/spike-deepseek-grading/README.md` 结论段。结论影响 ADR-003 的 30 秒阈值，由对应主笔在独立 PR 中回写。
 
 **验证问题**
 
