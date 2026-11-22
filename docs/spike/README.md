@@ -68,7 +68,8 @@ docs/spike/spike-<topic>/
 
 | 编号 | 主题 | 目录 | 负责人 | 状态 | 结论 |
 | --- | --- | --- | --- | --- | --- |
-| SP-01 | DeepSeek 结构化评分输出、延迟与费用 | `docs/spike/spike-deepseek-grading/` | 左恩东（主执行） / 王麒博（复核） | 进行中 | [#33](https://github.com/AI-exam-team/ai-exam-system/issues/33)，待实测 |
+| SP-01 | DeepSeek 结构化评分输出、延迟与费用 | `docs/spike/spike-deepseek-grading/` | 左恩东（主执行） / 王麒博（复核） | 已完成 | 可行：结构校验通过率 100%（21/21）、P95 0.794 秒、超时率 0%、21 次合计 0.01238612 元（单次 0.000589815 元）；四项指标口径与费用明细见 `docs/spike/spike-deepseek-grading/README.md` 结论段。[#33](https://github.com/AI-exam-team/ai-exam-system/issues/33) |
+
 | SP-02 | MySQL 并发交卷幂等 | `docs/spike/spike-mysql-submit-idempotency/` | 主执行 钱斓轩 / 复核 李昕彤 | 已完成 | 可行：唯一约束+条件更新；50 并发×10 轮每轮 1 成功/49 冲突 |
 | SP-03 | 自动交卷触发方式与调度漂移 | `docs/spike/spike-auto-submit-trigger/` | 主执行 钱斓轩 / 复核 李昕彤 | 已完成 | 可行：30s 定时+惰性兜底；10/10，0 重复；仅惰性 5/10 漏交；零答卷关闭已验证 |
 | SP-04 | 长文本答案与 utf8mb4 存储 | `docs/spike/spike-mysql-text-storage/` | 周裔（主执行） / 孙宇萱（复核） | 已完成 | 可行：MySQL 已验证 |
