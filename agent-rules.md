@@ -71,11 +71,14 @@
 
 **AR-3.1** 一任务一分支；分支必须从最新 `main` 拉出，一个分支只服务一个 Issue。
 
-**AR-3.2** 分支命名（仅允许以下两种）：
-- 代码/配置类：`feature/<module>-<issue>-<short-name>`
-- 纯文档类：`docs/<issue>-<name>`
+**AR-3.2** 分支命名（2026-11-21 起统一为课程规范）：
+- 功能/配置：`feature/issue-<issue>-<short-name>`
+- 文档：`docs/issue-<issue>-<short-name>`
+- 修复：`fix/issue-<issue>-<short-name>`
+- 测试：`test/issue-<issue>-<short-name>`
+- 技术探针：`spike/issue-<issue>-<short-name>`
 
-其中 `<module>` ∈ `qbank` | `exam` | `grading` | `infra`；`<issue>` 为 Issue 编号（不含 `#`）；`<short-name>` 为小写 kebab-case，不超过 5 个单词，仅含字母、数字、连字符。缺陷修复归入 `feature/` 并在描述中标注 `fix`。课程约定的空 PR 演练分支 `feature/issue-104-empty-pr` 为唯一例外，仅限 Issue-104 使用。
+其中 `<issue>` 为 Issue 编号（不含 `#`）；`<short-name>` 为小写 kebab-case，不超过 5 个单词，仅含字母、数字、连字符。旧格式 `<module>-<issue>-...` 仅保留给已存在的历史分支，不再新建。
 
 **AR-3.3** 禁止直接向 `main` 提交或推送；禁止强制推送（`--force`）；禁止未经评审自行合并。
 

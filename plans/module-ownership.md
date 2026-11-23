@@ -1,24 +1,24 @@
 # 模块分工与合并规则
 
-> 状态：第 6 周建议稿。**下方人员映射为建议方案，待小组确认，可调整**；未经小组确认前不作为已定事实。
-> 本文与 `.github/CODEOWNERS`、`plans/github-projects.md` 配套使用。
+> 状态：2026-11-21 按第 9 周实际分工更新。组内主笔与评审由各组自行商定，组长不指定。
+> 本文与 `.github/CODEOWNERS`、`plans/github-projects.md`、`plans/mvp1-plan.md` 配套使用。
 
-## 一、组织方式：6 人 3 组
+## 一、组织方式：3 个模块组 + 集成
 
-每组 2 人，对应 1 个业务模块；集成与契约由 1 名成员兼任，不单独成组。
+每组 2 个名额，对应 1 个业务模块；集成与契约由组长兼任。
 
-| 模块组 | 建议成员（待小组确认，可调整） | 模块标识 | 代码目录（规划） | Spec 目录（规划） |
+| 模块组 | 当前成员 | 模块标识 | 代码目录（规划） | Spec 目录（规划） |
 | --- | --- | --- | --- | --- |
-| 题库与组卷组 | 钱斓轩 / 孙宇萱 | `qbank` | `src/modules/qbank/` | `spec/qbank-spec-*.md` |
-| 在线考试与答卷组 | 王麒博 / 左恩东 | `exam` | `src/modules/exam/` | `spec/exam-spec-*.md` |
-| AI 主观题阅卷与教师复核组 | 周裔 / 李昕彤 | `grading` | `src/modules/grading/` | `spec/grading-spec-*.md` |
-| 集成与契约（兼任） | 李昕彤 | `integration` | `src/main/`、`src/frontend/`、`tests/` 协调 | `spec/spec-v*.md`、`adr/` |
+| 题库与组卷组 | 孙宇萱（主笔）、周裔 | `qbank` | `src/modules/qbank/` | `spec/module-01-qbank.md` |
+| 在线考试与答卷组 | 钱斓轩（主笔）、李昕彤（集成与评审） | `exam` | `src/modules/exam/` | `spec/module-02-exam.md` |
+| AI 主观题阅卷与教师复核组 | 王麒博（主笔）、左恩东（冷启动/评审） | `grading` | `src/modules/grading/` | `spec/module-03-grading.md` |
+| 集成与契约（兼任） | 李昕彤 | `integration` | `src/main/`、`src/frontend/`、`tests/` 协调 | `spec/`、`adr/`、`plans/` |
 
 说明：
 
-- 李昕彤在 `grading` 组内承担模块工作，同时兼任集成与契约负责人；若组内工作量冲突，由小组决定是否调整映射。
+- 李昕彤自第 9 周起任组长 / 集成与契约，不认领模块任务；登录与 JWT（T2）作为 `integration` 横切任务由集成负责人承担。
+- exam 组模块任务 T5–T7 由钱斓轩主笔；是否补第 2 名成员由组内商定，不影响组级任务归属。
 - 每组内部不做“一人写码、一人只挂名”的固定切分，按任务（Issue）认领，另一人默认担任评审。
-- 上表仅为建议，最终以周会确认并更新本文为准。
 
 ## 二、模块边界
 
