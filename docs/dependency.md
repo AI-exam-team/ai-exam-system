@@ -44,7 +44,7 @@
 
 | 消费方 | 被依赖方 | 允许方式 |
 | --- | --- | --- |
-| exam | qbank | 进程内只读查询接口（`PaperForExam`） |
+| exam | qbank | 进程内只读查询接口（`PaperForExam` / `findDuePapers`）；Paper 生命周期受控命令 `markPublished` / `markClosed` |
 | grading | exam | 进程内只读查询接口（`SubmittedSheetForGrading`） |
 | grading | qbank | 进程内只读查询接口（`QuestionForGrading`，含评分点） |
 | 全部业务模块 | integration | JWT 解析、统一异常与响应、日志、`AIService` |
@@ -57,6 +57,7 @@
 | qbank → exam / grading | 反向依赖，破坏单向 | 包依赖扫描 + PR 评审 |
 | exam → grading | 反向依赖 | 同上 |
 | 任何模块直接读写其他模块的表 | 隐式契约，改表即返工 | SQL / Mapper 评审 |
+| 绕过 `PaperLifecyclePort` 直接写 `papers` | 打穿 qbank 校验与快照冻结 | 代码检索 `papers` 表 SQL / Mapper；PR 评审 |
 | 前端直连 DeepSeek | 密钥泄露、绕过 `AIService` | 前端代码检索 `deepseek` / `api.deepseek` |
 | integration 依赖业务模块服务层 | 公共层反向依赖，形成环 | 包依赖扫描 |
 | 为了"复用"把业务逻辑放进公共层 | 边界模糊，模块不可独立测试 | 代码评审 |
@@ -92,18 +93,19 @@
 
 | 编号 | 风险 | 影响 | 应对 | 负责人 | 验证方式 |
 | --- | --- | --- | --- | --- | --- |
-| R-01 | 手动交卷、网络重试、到点自动交卷并发 | 重复提交、覆盖 `submittedAt`、生成第二份答卷 | 唯一约束 + 条件更新；ADR-002 | 钱斓轩 | SP-02 + exam AC-6、FR-9 |
+| R-01 | 手动交卷、网络重试、到点自动交卷并发 | 重复提交、覆盖 `submittedAt`、生成第二份答卷 | 唯一约束 + 条件更新；ADR-002 | 钱斓轩 | SP-02（待 MySQL 8 实测，未回填前标“待验证”）+ exam AC-6、FR-9 |
 | R-02 | DeepSeek 超时、限流、响应慢 | 教师长时间等待、请求失败、用户体验差 | 30 秒超时 + 有限重试 + 失败转人工；ADR-003 | 左恩东 / 王麒博 | SP-01 + grading NFR-4 |
 | R-03 | AI 返回 JSON 不合法、评分点缺失或分数越界 | 错误建议分、教师误采纳 | 整题结构校验，失败置 `FAILED`，不部分采纳 | 王麒博 | grading AC-4、AC-5 |
 | R-04 | 迟到的 AI 响应覆盖教师确认分 | 正式成绩被篡改，无法追溯 | 写回条件 `reviewedScore IS NULL`；保留 `aiScore` 原值 | 左恩东 | grading AC-13 |
 | R-05 | 已发布试卷的题目被后续修改（C-01） | 历史试卷、答卷、评分点不一致 | ADR-001 决定快照或引用；冻结发布后结构 | 孙宇萱 | ADR-001 + qbank AC / exam AC-1 |
 | R-06 | 三组接口契约不一致 | 第 10 周联调返工、任务无法并行 | 本文与 `architecture.md` 冻结接口清单；契约 PR 评审；AI 风险清单辅助 | 李昕彤 | 接口清单与 PR 核对 |
 | R-07 | AI 生成代码越界或风格割裂 | 维护困难、触碰 Non-Goals | `CLAUDE.md` + `agent-rules.md` + CODEOWNERS + PR 评审 | 全员 | PR 核验清单 |
-| R-08 | 自动交卷触发方式未定（定时任务 vs 惰性触发） | 逾期答卷未交、成绩发布被阻塞 | ADR-002 一并评估；SP-03 验证单实例调度漂移 | 钱斓轩 / 李昕彤 | SP-03 + exam AC-5 |
+| R-08 | 自动交卷触发方式未定（定时任务 vs 惰性触发）；零答卷试卷可能永不关闭 | 逾期答卷未交、成绩发布被阻塞 | ADR-002 + ADR-004：定时扫描 + `findDuePapers` 到期试卷；SP-03 验证调度漂移 | 李昕彤 / 钱斓轩 | SP-03（待 MySQL 8 实测，未回填前标“待验证”）+ exam AC-5 |
 | R-09 | 成绩发布部分可见或双写 `finalScore` | 学生看到未确认成绩，成绩不一致 | 整场事务发布；发布状态存储由 G-06 定稿 | 左恩东 / 李昕彤 | grading AC-9、AC-10 |
 | R-10 | JWT 有效期与刷新策略未定（TBD-08） | 考试中途掉线、被迫重新登录 | 第 8 周确定有效期，至少覆盖单场考试时长 | 李昕彤 | 配置评审 + 登录/过期测试 |
 | R-11 | 长文本答案与 utf8mb4 存储 | 答案截断、乱码、评分点描述丢失 | 字段类型与字符集探针；接口限制输入长度 | 孙宇萱 / 周裔 | SP-04 |
 | R-12 | 范围膨胀（顺手做客观题、统计、通知等） | MVP 无法按期交付 | Non-Goals 白名单 + PR 归属检查 | 全员 | `mvp1-scope.md` AC-S2、AC-S3 |
+| R-13 | Paper 发布/关闭的跨模块写路径未定 | 发布与自动交卷关闭无法实现；直接写表会打穿 qbank 校验 | qbank 受控命令 `markPublished` / `markClosed`；ADR-004 | 李昕彤 / 孙宇萱 | ADR-004 + exam AC-1、AC-5；代码无 `papers` 直接 SQL |
 
 **判定规则**：没有应对措施、没有负责人、没有验证方式的风险视为未识别，不得进入第 9 周任务。
 
@@ -113,6 +115,7 @@
 
 - [ ] 新增 import / SQL 是否越出本模块目录？
 - [ ] 是否出现 `qbank → exam/grading` 或 `exam → grading` 的反向调用？
+- [ ] exam 是否只通过 `PaperLifecyclePort` / `findDuePapers` 访问 Paper，而没有直接写 `papers`？
 - [ ] 跨模块调用是否只使用 `architecture.md` 第 6.5 节定义的 DTO？
 - [ ] 是否直接读写其他模块的表？
 - [ ] 前端是否出现 DeepSeek 地址或 API Key？
@@ -138,3 +141,4 @@
 | 版本 | 日期 | 变更人 | 变更内容 |
 | --- | --- | --- | --- |
 | v0.1 | 2026-11-17 | 李昕彤 | 建立依赖图与依赖矩阵、第三方依赖边界、12 条风险（含应对/负责人/验证方式）与每周检查清单 |
+| v0.2 | 2026-11-18 | 李昕彤 | 依 ADR-004 增加 Paper 生命周期受控命令；更新 R-01/R-08，新增 R-13 与“无直接写 papers”检查项 |
