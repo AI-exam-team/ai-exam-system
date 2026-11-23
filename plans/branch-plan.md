@@ -2,11 +2,11 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 版本 | v0.3（Issue 编号已回填，T2 归集成） |
+| 版本 | v0.4（三组负责人已回填） |
 | 状态 | 草稿 |
 | 日期 | 2026-11-21 |
 | 负责人 | 李昕彤（组长 / 集成与契约） |
-| 依据 | `plans/mvp1-plan.md` v0.3；课程第 9 周分支策略 |
+| 依据 | `plans/mvp1-plan.md` v0.4；课程第 9 周分支策略 |
 
 > 一任务一分支，全部从 `main` 切出；合并方式 squash，合并后删除任务分支。
 
@@ -24,18 +24,18 @@
 
 | 任务ID | 分支名 | 类型 | 基础分支 | 关联 Issue | 负责人 | 合并要求 |
 | --- | --- | --- | --- | --- | --- | --- |
-| T1 | `feature/issue-39-schema-init` | feature | `main` | #39 | qbank 组 | PR 准入 8 条 + 非作者评审 |
-| T2 | `feature/issue-42-auth-jwt` | feature | `main` | #42 | 李昕彤（集成） | 同上；横切能力，涉及契约需组长评审 |
-| T3 | `feature/issue-40-question-rubric` | feature | `main` | #40 | qbank 组 | 同上 |
-| T4 | `feature/issue-41-paper-draft` | feature | `main` | #41 | qbank 组 | 同上 |
-| T5 | `feature/issue-43-exam-publish` | feature | `main` | #43 | exam 组 | 同上；涉及 `ADR-004` 需组长评审 |
-| T6 | `feature/issue-44-answer-draft` | feature | `main` | #44 | exam 组 | 同上 |
-| T7 | `feature/issue-45-submit` | feature | `main` | #45 | exam 组 | 同上 |
-| T8 | `feature/issue-46-ai-grade` | feature | `main` | #46 | grading 组 | 同上；涉及 `ADR-003` 需组长评审 |
-| T9 | `feature/issue-47-ai-fallback` | feature | `main` | #47 | grading 组 | 同上 |
-| T10 | `feature/issue-48-review` | feature | `main` | #48 | grading 组 | 同上 |
-| T11 | `feature/issue-49-score-publish` | feature | `main` | #49 | grading 组 | 同上 |
-| T12 | `feature/issue-50-score-view` | feature | `main` | #50 | grading 组 | 同上 |
+| T1 | `feature/issue-39-schema-init` | feature | `main` | #39 | 周裔（qbank） | PR 准入 8 条 + 孙宇萱评审 |
+| T2 | `feature/issue-42-auth-jwt` | feature | `main` | #42 | 李昕彤（集成） | 同上；作者不自审，评审人钱斓轩 |
+| T3 | `feature/issue-40-question-rubric` | feature | `main` | #40 | 周裔（qbank） | 同上，孙宇萱评审 |
+| T4 | `feature/issue-41-paper-draft` | feature | `main` | #41 | 周裔（qbank） | 同上，孙宇萱评审 |
+| T5 | `feature/issue-43-exam-publish` | feature | `main` | #43 | 钱斓轩（exam） | 同上；涉及 `ADR-004` 需组长评审 |
+| T6 | `feature/issue-44-answer-draft` | feature | `main` | #44 | 钱斓轩（exam） | 同上，李昕彤评审 |
+| T7 | `feature/issue-45-submit` | feature | `main` | #45 | 钱斓轩（exam） | 同上，李昕彤评审 |
+| T8 | `feature/issue-46-ai-grade` | feature | `main` | #46 | 王麒博（grading） | 同上；涉及 `ADR-003` 需组长评审 |
+| T9 | `feature/issue-47-ai-fallback` | feature | `main` | #47 | 王麒博（grading） | 同上，左恩东评审 |
+| T10 | `feature/issue-48-review` | feature | `main` | #48 | 王麒博（grading） | 同上，左恩东评审 |
+| T11 | `feature/issue-49-score-publish` | feature | `main` | #49 | 王麒博（grading） | 同上，左恩东评审 |
+| T12 | `feature/issue-50-score-view` | feature | `main` | #50 | 王麒博（grading） | 同上，左恩东评审 |
 
 ## 3. 第 9 周文档分支
 
@@ -58,5 +58,6 @@
 
 ## 5. 规则同步
 
+- 2026-11-23 三组负责人已回填：qbank 周裔 / 孙宇萱（评审）、exam 钱斓轩 / 李昕彤（评审）、grading 王麒博 / 左恩东（评审）。
 - 2026-11-21 已将 `agent-rules.md` AR-3.2 与 `CLAUDE.md` 统一为课程规范 `feature/issue-{N}-{short-name}`。
 - 旧格式 `<module>-<issue>-...` 只对应已存在的历史分支，不再新建；历史分支不改名。
