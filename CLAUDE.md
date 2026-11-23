@@ -29,7 +29,7 @@
 
 ## 分支与 PR
 
-- 一任务一分支，从 `main` 拉出：`feature/<module>-<issue>-<short-name>` 或 `docs/<issue>-<name>`。
+- 一任务一分支，从 `main` 拉出：`feature/issue-<issue>-<short-name>` 或 `docs/issue-<issue>-<short-name>`。
 - 提交信息：`type(scope): summary`。
 - PR 必须关联 Issue、关联 spec、填写 AI 使用说明、测试证据、风险与回滚。
 - 至少 1 名非作者模块 owner 评审；契约文件 PR 须集成负责人评审。
