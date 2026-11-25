@@ -1,0 +1,17 @@
+SP-03 post-run verification
+
+version	charset	engine
+8.0.46	utf8mb4	InnoDB
+
+id	status	answer_count	submitted	draft	auto	submitted_at_mismatch
+sp03-a	CLOSED	10	10	0	10	0
+sp03-a-control	CLOSED	1	1	0	0	1
+sp03-a-zero	CLOSED	0	0	0	0	0
+sp03-c	CLOSED	10	10	0	10	0
+sp03-c-control	CLOSED	1	1	0	0	1
+sp03-c-zero	CLOSED	0	0	0	0	0
+sp03-restart	CLOSED	10	10	0	10	0
+
+Repeated DRAFT conditional update rows affected: A=0; C=0; Restart=0
+
+Concurrent race: Manual affected=1; auto affected=0; total affected=1; final=SUBMITTED,MANUAL,2026-11-18 16:36:30.683
