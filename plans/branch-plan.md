@@ -2,11 +2,11 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 版本 | v0.7（远端 ADR 状态已核实） |
+| 版本 | v0.8（ADR-004 已接受，T5/T7 解除闸门） |
 | 状态 | 草稿 |
-| 日期 | 2026-11-24 |
+| 日期 | 2026-11-25 |
 | 负责人 | 李昕彤（组长 / 集成与契约） |
-| 依据 | `plans/mvp1-plan.md` v0.6；课程第 9 周分支策略 |
+| 依据 | `plans/mvp1-plan.md` v0.8；课程第 9 周分支策略 |
 
 > 一任务一分支，全部从 `main` 切出；合并方式 squash，合并后删除任务分支。
 
@@ -28,9 +28,9 @@
 | T2 | `feature/issue-42-auth-jwt` | feature | `main` | #42 | 李昕彤（集成） | 同上；作者不自审，评审人钱斓轩 |
 | T3 | `feature/issue-40-question-rubric` | feature | `main` | #40 | 周裔（qbank） | 同上，孙宇萱评审 |
 | T4 | `feature/issue-41-paper-draft` | feature | `main` | #41 | 周裔（qbank） | 同上，孙宇萱评审 |
-| T5 | `feature/issue-43-exam-publish` | feature | `main` | #43 | 钱斓轩（exam） | 同上；`ADR-004` 转「已接受」前只提交计划/设计，不写生产代码 |
+| T5 | `feature/issue-43-exam-publish` | feature | `main` | #43 | 钱斓轩（exam） | 同上；`ADR-004` 已接受（PR #55 已合入），可开发 |
 | T6 | `feature/issue-44-answer-draft` | feature | `main` | #44 | 钱斓轩（exam） | 同上，李昕彤评审；`ADR-002` 已接受，可开发 |
-| T7 | `feature/issue-45-submit` | feature | `main` | #45 | 钱斓轩（exam） | 同上，李昕彤评审；`ADR-002` 已接受；涉及 `ADR-004` 的关闭路径待 PR #55 合并 |
+| T7 | `feature/issue-45-submit` | feature | `main` | #45 | 钱斓轩（exam） | 同上，李昕彤评审；`ADR-002`、`ADR-004` 均已接受，可开发 |
 | T8 | `feature/issue-46-ai-grade` | feature | `main` | #46 | 王麒博（grading） | 同上；涉及 `ADR-003` 需组长评审 |
 | T9 | `feature/issue-47-ai-fallback` | feature | `main` | #47 | 王麒博（grading） | 同上，左恩东评审 |
 | T10 | `feature/issue-48-review` | feature | `main` | #48 | 王麒博（grading） | 同上，左恩东评审 |
@@ -58,7 +58,8 @@
 
 ## 5. 规则同步
 
-- 2026-11-24 远端核实：`ADR-002` 已接受（PR #56 合入 main），T6/T7 解除闸门；`ADR-004` 待 PR #55 评审合并，T5/T7 关闭路径仍只做计划。
+- 2026-11-25 远端核实：PR #55 已合入 main，`ADR-004` 已接受；T5、T7 的 ADR-004 闸门解除，可按本表开发。
+- 2026-11-24 远端核实：`ADR-002` 已接受（PR #56 合入 main），T6/T7 解除闸门。
 - 2026-11-24 #43–#45 Issue 回填同步：T5 加 `ADR-004` 闸门，T6/T7 加 `ADR-002`（及 T7 的 `ADR-004`）闸门；分支名不变，详见 `plans/mvp1-plan.md` v0.6 §2.2。
 - 2026-11-24 #39–#41 Issue 回填同步：T1 分支改为 `feature/issue-39-qbank-db-schema`；T3、T4 分支名不变，AC 与依赖调整见 `plans/mvp1-plan.md` v0.5。
 - 2026-11-23 三组负责人已回填：qbank 周裔 / 孙宇萱（评审）、exam 钱斓轩 / 李昕彤（评审）、grading 王麒博 / 左恩东（评审）。

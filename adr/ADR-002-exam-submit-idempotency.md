@@ -88,7 +88,7 @@ UPDATE answer_sheets
 2. 逐份执行第 2 条条件更新，参数：`submitted_at = paper.endAt`（**不是扫描时刻**，符合 AC-5 / contract 2.4），`submit_type='AUTO'`；
 3. 全部成功（或本来就没有 `DRAFT` 答卷）后，调用 qbank `markClosed(paperId)`。
 
-> `findDuePapers` / `markClosed` 由 ADR-004 定义为 qbank 受控命令（提议，待评审）；exam 不直接读 `papers` 表，也不直接 `UPDATE papers`。
+> `findDuePapers` / `markClosed` 由 ADR-004 定义为 qbank 受控命令（已接受）；exam 不直接读 `papers` 表，也不直接 `UPDATE papers`。
 
 **兜底机制**：学生在 `endAt` 后调用保存/交卷接口时，先对本人 `DRAFT` 答卷执行同一条件更新：
 
@@ -107,7 +107,7 @@ UPDATE answer_sheets
 2. 全部成功（或本来就没有 `DRAFT` 答卷）后，调用 qbank `markClosed(paperId)`（受控命令，见 Q-1）；零答卷试卷由 `findDuePapers` 枚举，不依赖 `answer_sheets` 是否存在；
 3. 任一份失败则本轮不关闭该试卷，下一轮重试，避免 `CLOSED` 后无法再自动交卷。
 
-> 写路径由 ADR-004 裁决（提议）：`Paper` 归 qbank，exam 调用 `markClosed(paperId)`，不直接改表；见 `docs/architecture.md` 6.3.1 与 6.3.10。
+> 写路径由 ADR-004 裁决（已接受）：`Paper` 归 qbank，exam 调用 `markClosed(paperId)`，不直接改表；见 `docs/architecture.md` 6.3.1 与 6.3.10。
 
 ### 6. 并发结果矩阵
 
@@ -174,7 +174,7 @@ UPDATE answer_sheets
 - 自动交卷有最多约 30 秒的延迟；`submittedAt` 仍记为 `endAt`，但学生看到「已交卷」可能比 `endAt` 晚。
 - 单实例假设：多实例部署时两个调度器会同时扫描；条件更新保证不重复迁移，但会产生无效扫描。MVP1 单实例可接受；多实例需另起 ADR（如 ShedLock 或数据库抢占）。
 - `fixedDelay` 扫描会占用一个调度线程；单批 200 份、每份一次条件更新，正常规模可接受。
-- 试卷 `CLOSED` 的写路径由 ADR-004 裁决（qbank `markClosed`，提议待评审）；评审通过后才能实现。
+- 试卷 `CLOSED` 的写路径由 ADR-004 裁决（qbank `markClosed`，已接受）；第 10 周可按命令实现。
 - 需要契约升版登记 `VALIDATION_ERROR`；`PAPER_NOT_DRAFT` 已在 5.1 登记，待契约 v0.2 转正式。
 
 ### 后续需要完成的事项
@@ -182,7 +182,7 @@ UPDATE answer_sheets
 - [x] SP-02：执行 50 并发 × 10 轮实验，回填成功/冲突/行数/`submitted_at` 数据（钱斓轩）。
 - [x] SP-03：执行三种触发方案对比，回填扫描间隔与漂移结论（钱斓轩主、李昕彤复核）。
 - [ ] 契约 v0.2：登记 `VALIDATION_ERROR`；`PAPER_NOT_DRAFT` 已入 5.1，待转正式（集成负责人）。
-- [x] Q-1：ADR-004 已提出（qbank `markPublished` / `markClosed`，提议待评审）；6.3.1 / 6.3.8 已按命令描述。
+- [x] Q-1：ADR-004 已接受（qbank `markPublished` / `markClosed`）；6.3.1 / 6.3.8 已按命令描述。
 - [ ] Q-2：G-01 若要求 `CLOSED` 后才能发布成绩，补 `ExamProgressForGrading` DTO（李昕彤 + 左恩东）。
 - [x] Q-6：ADR-004 已改为 qbank `findDuePapers(now)`；不得同库 JOIN。
 - [x] Q-7：6.5 已在 `docs/32-exam-integration` 补齐 `startAt` / `endAt` / `publishedAt` / `createdBy`；qbank 确认。

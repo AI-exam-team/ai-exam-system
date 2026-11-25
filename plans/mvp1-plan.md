@@ -2,9 +2,9 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 版本 | v0.7（远端 ADR 状态已核实） |
-| 状态 | 草稿，待交叉评审与看板录入 |
-| 日期 | 2026-11-24 |
+| 版本 | v0.8（PR #55 已合入，ADR-004 已接受） |
+| 状态 | 草稿，待交叉评审 |
+| 日期 | 2026-11-25 |
 | 负责人 | 李昕彤（组长 / 集成与契约） |
 | 依据 | `docs/architecture.md` v0.1；`spec/mvp1-scope.md` v0.2；`spec/module-01~03`；`spec/contract-v0.1.md`；`adr/ADR-001`、`adr/ADR-004`；课程第 9 周 |
 | 评审人 | 按 `plans/roles.md`：qbank 孙宇萱、exam 李昕彤、grading 左恩东；T2 由钱斓轩评审（作者不自审） |
@@ -30,7 +30,7 @@
 | T2 | `mvp1-scope` §3.3；`module-02 AC-9` | 教师 / 学生登录与 JWT 鉴权（#42） | 李昕彤（组长 / 集成） | `feature/issue-42-auth-jwt` | T1（#39） | 登录成功返回 JWT；无 token / 失效 token 401；越权 403 | Backlog |
 | T3 | `module-01 AC-1`、`AC-2`、`AC-3` | 题目与评分点录入（含模糊词拦截）（#40） | 周裔（qbank） | `feature/issue-40-question-rubric` | T1（#39）；T2（#42，集成） | 建题保存成功；模糊评分点 409 `RUBRIC_DESCRIPTION_VAGUE`；分值不等 409 `RUBRIC_SCORE_MISMATCH` | Backlog |
 | T4 | `module-01 AC-4`、`FR-4` | 组卷并保存 DRAFT 试卷（#41） | 周裔（qbank） | `feature/issue-41-paper-draft` | T3（#40）；T1（#39）；T2（#42，集成） | 2–5 题组卷保存为 DRAFT；仅 `ACTIVE` 题目可加入；单题分值继承不可改；总分由各题汇总 | Backlog |
-| T5 | `module-02 AC-1`、`AC-7`、`AC-8`；`ADR-004` | 发布考试与时间窗口校验（DRAFT → PUBLISHED）（#43） | 钱斓轩（exam） | `feature/issue-43-exam-publish` | T4（#41）；T2（#42，集成）；ADR-004（未接受前只做计划） | 发布成功；空卷 / 总分不符 / 窗口非法分别 409；非本人试卷 403；窗口外操作 403 `EXAM_NOT_STARTED` / `EXAM_CLOSED` | Backlog |
+| T5 | `module-02 AC-1`、`AC-7`、`AC-8`；`ADR-004` | 发布考试与时间窗口校验（DRAFT → PUBLISHED）（#43） | 钱斓轩（exam） | `feature/issue-43-exam-publish` | T4（#41）；T2（#42，集成）；ADR-004（已接受） | 发布成功；空卷 / 总分不符 / 窗口非法分别 409；非本人试卷 403；窗口字段落库且以服务端时间为权威；窗口外 403 `EXAM_NOT_STARTED` / `EXAM_CLOSED` 由 T6 回归 | Backlog |
 | T6 | `module-02 AC-2`、`AC-3`、`AC-10` | 学生进入考试与草稿自动保存（#44） | 钱斓轩（exam） | `feature/issue-44-answer-draft` | T5（#43）、T2（#42，集成）；ADR-002（已接受） | 首次进入建卷、重复进入返回同一份；保存失败 1s/2s/4s 重试 3 次并提示未保存；AC-7/AC-9 只做回归 | Backlog |
 | T7 | `module-02 AC-4`、`AC-5`、`AC-6`（AC-11 写入验收不单独绑定） | 手动交卷、到点自动交卷与幂等（#45） | 钱斓轩（exam） | `feature/issue-45-submit` | T6（#44）；ADR-002；ADR-004 | 交卷置 SUBMITTED；重复交卷 409 `EXAM_ALREADY_SUBMITTED`；手动与自动并发仅迁移一次；AC-11 与 T6 联测，E2E AC-S1 留证据 | Backlog |
 | T8 | `module-03 AC-1`、`AC-2`、`AC-3` | AI 初评成功路径与结果复用（#46） | 王麒博（grading） | `feature/issue-46-ai-grade` | T7（#45） | 仅 SUBMITTED 可初评；逐评分点输出命中、理由与得分；重复触发不重复调用模型 | Backlog |
@@ -62,10 +62,10 @@
 
 > 以下为硬闸门，未解除前对应任务只产出计划与设计，不写生产代码。
 
-| 闸门 | 影响任务 | 当前状态（2026-11-24 核实） | 解除条件 |
+| 闸门 | 影响任务 | 当前状态（2026-11-25 核实） | 解除条件 |
 | --- | --- | --- | --- |
 | ADR-002 交卷幂等 | T6、T7 | **已解除**：2026-11-23 转「已接受」，PR #56 已合入 main（评审：李昕彤、左恩东）；`adr/ADR-002-exam-submit-idempotency.md` 在 main | — |
-| ADR-004 发布写路径 | T5、T7 联调 | 文件在 `docs/issue-32-adr-004` 分支，**PR #55 已开、0 评审、未合并**；ADR-004 仍为「提议」 | PR #55 由孙宇萱、钱斓轩评审，组长合并后转「已接受」 |
+| ADR-004 发布写路径 | T5、T7 联调 | **已解除**：2026-11-25 PR #55 已合入 main（评审：孙宇萱、钱斓轩）；ADR-004 已转「已接受」 | — |
 
 ## 3. 依赖与关键路径
 
@@ -77,7 +77,7 @@ T1 ─┬─ T2 ─────────────────────�
 - 关键路径：`T1 → T3 → T4 → T5 → T6 → T7 → T8 → T9 → T10 → T11 → T12`
 - 并行线：`T2` 在 `T1` 后可与 qbank 线并行，`T12` 与 `T2` 汇合。
 - 集成依赖：`T3`、`T4` 另依赖 `T2`（#42，JWT 鉴权），属接口可联调条件，不改变关键路径。
-- 闸门依赖：`T5` 与 `T7` 的考试关闭路径受 ADR-004 闸门约束（PR #55 合并前只做计划）；`T6`、`T7` 的 ADR-002 闸门已于 2026-11-23 解除（见 §2.2）。
+- 闸门依赖：`T5`、`T7` 的 ADR-004 闸门已于 2026-11-25 解除（PR #55 已合入）；`T6`、`T7` 的 ADR-002 闸门已于 2026-11-23 解除（见 §2.2）。
 - 数据层先做（T1）；所有跨模块读取只走契约。
 
 ## 4. 第 9 周横向任务（不占 12 个 MVP1 任务名额）
@@ -87,7 +87,7 @@ T1 ─┬─ T2 ─────────────────────�
 | D1 | 本文件：八列任务表与规则 | 李昕彤 | 周会前 | This Week |
 | D2 | `plans/branch-plan.md` 分支规划表 | 李昕彤 | 周会后次日 | This Week |
 | D3 | PR 准入条件（模板 + 本文件附录） | 李昕彤 | 周会前 | This Week |
-| D4 | 12 个 Issue 已建（#39–#50），本周卡 #51，待录入 Project #2 | 李昕彤 | 周会后次日 | This Week |
+| D4 | 12 个 Issue 已建（#39–#50）并录入 Project #2；#51 在 This Week，D1/D3 单独建卡 | 李昕彤 | 周会后次日 | This Week |
 | D5 | `plans/roles.md` 角色轮换表 | 李昕彤 + 各组回填 | 周会后 | This Week |
 
 > 看板「This Week」至少放 D1、D3 两张卡，避免“只建不用”。
@@ -109,14 +109,15 @@ T1 ─┬─ T2 ─────────────────────�
 
 - 容量：T2 登录与 JWT 已归集成（组长）；exam 组 T5–T7 由钱斓轩主笔，是否补第 2 名成员由组内商定，不阻塞第 9 周交付。
 - 已统一：`mvp1-scope` v0.2、`module-02` v0.3、`plans/module-ownership.md` 的负责人；`agent-rules.md` 与 `CLAUDE.md` 的分支规范；PR 模板。
-- D4 看板：Issue #39–#51 已在 GitHub；Project #2 的录入、字段与 This Week 列待完成。
+- D4 看板：Issue #39–#51 已在 GitHub 并录入 Project #2；12 个 MVP1 任务在 Backlog，#51 在 This Week，D1/D3 单独建卡后闭环。
 - 任务行负责人已按各组回报回填：qbank 周裔（Reviewer 孙宇萱）、exam 钱斓轩（Reviewer 李昕彤）、grading 王麒博（Reviewer 左恩东）；T2 由李昕彤承担，评审人指定钱斓轩（作者不自审）。
 - grading 组的负责人与 Reviewer 按模块 spec 文件头（王麒博主笔、左恩东冷启动/评审）回填；若组内另有安排，改 `plans/roles.md` 与本表即可。
 - 2026-11-24 按 #39–#41 Issue 回填同步：T1 分支改为 `feature/issue-39-qbank-db-schema` 并绑 `module-01 AC-1/AC-3/AC-4`；T3 补 AC-3 与 #42 集成依赖；T4 改为 `AC-4 + FR-4` 并补 #39/#42 依赖；R-01 与 E39–E41 见 §2.1。
-- 2026-11-24 远端核查：Issue #39–#50 已全部有负责人（#39–#41 @causalwill、#42 @Eternity1022、#43–#45 @Ransoo-1019、#46–#50 @aawebai）；#39–#45 正文已含 AC/风险/证据；ADR-002 已接受（PR #56 合入 main），ADR-004 待 PR #55 评审合并。
+- 2026-11-24 远端核查：Issue #39–#50 已全部有负责人（#39–#41 @causalwill、#42 @Eternity1022、#43–#45 @Ransoo-1019、#46–#50 @aawebai）；#39–#45 正文已含 AC/风险/证据；ADR-002 已接受（PR #56 合入 main）。
+- 2026-11-25 远端核查：PR #55 已双人 approve 并合入 main，ADR-004 已接受、T5/T7 闸门解除；PR #57 按 exam 评审意见更新 §2.2、T5 验收与 PR 准入说明。
 - 2026-11-24 按 #43–#45 Issue 回填同步：T5 补 AC-7 与 `ADR-004` 闸门；T6 补 `ADR-002` 闸门，AC-7/AC-9 改为回归；T7 补 `ADR-002`/`ADR-004` 依赖，AC-11 写入验收与 E2E 证据；T5–T7 负责人钱斓轩不变；风险与 E43–E45 见 §2.1，闸门见 §2.2。
 
-### 7.1 课程第 9 周检查表自查（2026-11-24）
+### 7.1 课程第 9 周检查表自查（2026-11-25）
 
 | 检查项 | 状态 | 说明 |
 | --- | --- | --- |
@@ -126,8 +127,8 @@ T1 ─┬─ T2 ─────────────────────�
 | 依赖顺序明确，标关键路径 | ✅ | §3；新增 ADR 闸门见 §2.2 |
 | 分支规划表完整，命名规范 | ✅ | `plans/branch-plan.md`；`feature/issue-{N}-{desc}` |
 | PR 准入条件完整 | ✅ | `.github/pull_request_template.md` 覆盖课程 8 条 |
-| 全部 MVP1 任务录入 Projects | ⏳ | Issue #39–#50 已建，Project #2 录入待办 |
-| This Week 有卡片，Review 列已建 | ⏳ | D1/D3 待放入 |
+| 全部 MVP1 任务录入 Projects | ✅ | Issue #39–#50 已录入 Project #2，均在 Backlog |
+| This Week 有卡片，Review 列已建 | ✅ | #51 在 This Week；D1/D3 卡已建并放入 This Week |
 | 每个任务有负责人，无「待定」 | ✅ | §2 与 §2.1 |
 | 未拆非 MVP1 模块 | ✅ | Non-Goals 见 §6 |
 
@@ -142,3 +143,4 @@ T1 ─┬─ T2 ─────────────────────�
 | v0.5 | 2026-11-24 | 李昕彤 | 同步 #39–#41 Issue 回填：T1 分支名与 AC、T3 AC-3 与 #42 依赖、T4 改 AC-4+FR-4 及依赖；新增 §2.1 风险与证据 |
 | v0.6 | 2026-11-24 | 李昕彤 | 同步 #43–#45 回填：T5 补 AC-7、T6/T7 补 ADR 依赖与 AC-11 验收；新增 §2.1 风险证据与 §2.2 ADR 开工闸门（ADR-002 未合入、ADR-004 未接受）；评审人改为按 roles.md 指定，补 §7.1 课程检查表自查 |
 | v0.7 | 2026-11-24 | 李昕彤 | 核实远端：ADR-002 已接受（PR #56），解除 T6/T7 闸门；ADR-004 待 PR #55；Issue #39–#50 负责人与正文已同步 |
+| v0.8 | 2026-11-25 | 李昕彤 | PR #55 已合入，ADR-004 已接受并解除 T5/T7 闸门；按 exam 评审修正 T5 窗口验收口径；更新看板自查；同步 ADR-002 中 ADR-004 状态引用 |
