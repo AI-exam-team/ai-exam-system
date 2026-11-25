@@ -1,0 +1,15 @@
+# SP-03 实验环境
+- MySQL 版本：8.0.46
+- MySQL 当前时间：2026-11-18 16:28:52.847000
+- 安装目录：D:\SQL2022\mysql8\mysql-8.0.46-winx64
+- 数据目录：D:\SQL2022\mysql8\data
+- 连接：127.0.0.1:3306 / spike
+- 执行方式：PowerShell fixedDelay 30s 扫描循环 + MySQL 8 条件更新
+- 运行日期：2026-11-18 16:28:53 +08:00
+- 操作系统：Microsoft Windows 11 家庭中文版 (64 位)，版本 10.0.22621
+- CPU：AMD Ryzen 5 5500U with Radeon Graphics         
+- 内存：15.3 GiB
+- MySQL 存储：InnoDB；字符集：utf8mb4
+- 监听范围：127.0.0.1:3306；Windows 服务：未注册（当前用户进程）
+- 安装包校验：官方 MD5 003f527d5df61b663ff191038cd676bd；本机校验匹配
+- 调度探针：PowerShell fixedDelay 30s；未运行 JDK / Spring Boot

@@ -3,7 +3,7 @@
 | 项目 | 内容 |
 | --- | --- |
 | 编号 | ADR-001 |
-| 状态 | 提议（待评审；通过前 `architecture.md` 6.2 的快照行为仅作设计草案） |
+| 状态 | 已接受（2026-11-23；周裔、李昕彤复核；验证结论见 `docs/spike/`） |
 | 日期 | 2026-11-17（第 8 周） |
 | 主笔 | 孙宇萱（qbank） |
 | 复核 | 周裔（qbank）、李昕彤（集成与契约） |
@@ -46,11 +46,11 @@
 
 1. **组卷时（qbank）**：`POST /api/v1/papers` 在同一事务内，把每道入选题目的 `type`、`stem`、`referenceAnswer`、`totalScore` 及全部 `rubric` 条目（`rubricItemId` / `description` / `score` / `order`）深拷贝到 `paper_items` 的快照列，保留 `questionId` 作为追溯关联。这份快照在本文中称为**基线快照**。
 2. **草稿阶段（qbank）**：基线快照用于对比，不自动跟随原题变化。新增只读接口 `GET /api/v1/papers/{id}/snapshot-diff`，逐题返回 `changed` 与 `baseline` / `current` 内容；**接口契约本期预留，前端对比页面第 10 周实现**。MVP1 不提供“刷新快照”写接口；教师若确认要换用当前题目，重新组卷即可。
-3. **发布时（exam）**：`exam` 只把 `Paper` 从 `DRAFT` 改为 `PUBLISHED`，**不调用 qbank 写接口**。基线快照随 `Paper.status=PUBLISHED` 在语义上成为**正式快照**，并停止变更；下游只读这份快照。这样避免 `exam → qbank` 的跨模块写，保持依赖方向不变。
+3. **发布时（exam）**：`exam` 调用 qbank 的 `markPublished` 受控命令（ADR-004），由 qbank 完成 `DRAFT → PUBLISHED`、窗口写入与快照冻结；`exam` **不直接写 qbank 表**。基线快照随 `Paper.status=PUBLISHED` 在语义上成为**正式快照**，并停止变更；下游只读这份快照。
 4. **下游读取**：`exam` 发布校验、学生答题页、`grading` AI 初评只读快照，永不回源读取 `questions` 表的最新内容。
 5. **锁题规则（保留）**：`PUT /api/v1/questions/{id}` 在题目被任一 `PUBLISHED` 试卷引用时返回 409 `QUESTION_ALREADY_USED`。这是**产品策略**，不是快照机制的技术必需；代价与取舍见“取舍与 trade-off”。
 
-> **为什么不在发布时“生成”一份新快照**：发布属于 exam，快照属于 qbank。若 exam 在发布时调用 qbank 写接口生成正式快照，会形成 `exam → qbank` 的跨模块写，违反当前依赖规则。MVP1 采用“组卷时存基线、发布时冻结”的一快照模型；若未来需要发布前刷新快照，应增加 qbank 的 **DRAFT 专用**刷新接口，由教师在草稿阶段触发，而不是让 exam 写 qbank。
+> **为什么不在发布时“生成”第二份快照**：发布属于 exam，快照属于 qbank。MVP1 采用“组卷时存基线、发布时冻结”的一快照模型；发布通过 qbank 的 `markPublished` 受控命令完成状态迁移与冻结（ADR-004），不产生 `exam` 直接写 qbank 表。若未来需要发布前刷新快照，应增加 qbank 的 **DRAFT 专用**刷新接口，由教师在草稿阶段触发，而不是让 exam 写 qbank。
 
 配套规则：
 
@@ -144,7 +144,7 @@
 | `GET /api/v1/papers/{id}/snapshot-diff` | 新增只读 diff 接口：逐题返回 `changed`、`baseline`、`current`；仅教师本人试卷；前端第 10 周实现 |
 | `PUT /api/v1/questions/{id}` | 若题目被任一 `PUBLISHED` 试卷引用，返回 409 `QUESTION_ALREADY_USED`（待契约 v0.2 登记） |
 | `GET /api/v1/papers/{id}` | `DRAFT` 返回基线快照字段；当前题目与差异通过 `snapshot-diff` 获取；`PUBLISHED` / `CLOSED` 只返回冻结的正式快照 |
-| `POST /api/v1/papers/{id}/publish` | 属于 exam；只改状态，不调用 qbank 写接口；快照随状态成为正式快照 |
+| `POST /api/v1/papers/{id}/publish` | 属于 exam；调用 qbank `markPublished` 受控命令，qbank 完成状态迁移与快照冻结；exam 不直接写表（ADR-004） |
 | 跨模块只读读取，按 `architecture.md` 6.5 的 `PaperForExam` | 从 `paper_items` 快照组装，不从 `questions` 取 |
 | 跨模块只读读取，按 `architecture.md` 6.5 的 `QuestionForGrading` | 从快照组装；同一题在不同试卷可能是不同快照，需按 `paperId` 定位 |
 
@@ -183,3 +183,4 @@
 | 2026-11-17 | 评审修订：改为“组卷基线快照 + 发布冻结”，新增 draft diff 接口（前端后置）；明确 exam 不写 qbank；保留锁题规则并记录代价；SP-04 结论改为待 MySQL 8 复核 | 回应第 8 周评审：避免跨模块写、修正证据链、统一快照语义 |
 | 2026-11-18 | 回填 SP-04 基于 MySQL 8 的实测结论：确认普通 `TEXT` 字段存 50KB 中文及表情会触发 `ERROR 1406`，正式确定快照字段选用 `MEDIUMTEXT`。 | 闭环 SP-04 待复核项，为第 9 周数据模型（数据表建表）提供明确的字段类型依据。 |
 | 2026-11-19 | 回填 SP-04 验证结论：确认使用 `MEDIUMTEXT` 存储长文本；补充底层 `HEX()` 验证证据（确证编码 `F09F988A`），解决终端显示乱码疑虑；补充 JSON 字段实测结果 | 闭环 SP-04 及评审提出的 HEX 证据与 JSON 测试要求，为第 9 周数据模型提供定稿依据 |
+| 2026-11-18 | 关联 ADR-004：发布改为调用 qbank `markPublished` 受控命令；不再表述为“exam 不调用 qbank 写接口” | Q-1 裁决后对齐 Paper 生命周期的唯一写路径 |

@@ -1,0 +1,5 @@
+"Round","Plan","DraftTotal","CompletedByEndAtPlus60","RepeatedMigrations","ZeroPaperClosed","RestartRescan","Notes"
+"1","A","10","10","0","CLOSED","n/a","draft=0; auto=10; wrongSubmittedAt=0"
+"2","B","10","0","0","PUBLISHED","n/a","no request; draft=10; zero-paper=PUBLISHED"
+"3","C","10","10","0","CLOSED","n/a","one request fallback; draft=0; auto=10; wrongSubmittedAt=0"
+"4","Restart","10","10","0","n/a","CLOSED on first scan; draft=0","first scan at endAt+30s; auto=10; wrongSubmittedAt=0"
