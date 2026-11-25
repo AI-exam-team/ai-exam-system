@@ -1,0 +1,5 @@
+﻿user_id,start_time_iso,end_time_iso,model,name,api_key_name,api_key,type,price,amount
+***REDACTED***,2026-11-22T20:00:00+08:00,2026-11-22T21:00:00+08:00,deepseek-flash,deepseek-flash,***REDACTED***,***REDACTED***,input_cache_miss_tokens,0.000001,4507
+***REDACTED***,2026-11-22T20:00:00+08:00,2026-11-22T21:00:00+08:00,deepseek-flash,deepseek-flash,***REDACTED***,***REDACTED***,input_cache_hit_tokens,0.00000002,3956
+***REDACTED***,2026-11-22T20:00:00+08:00,2026-11-22T21:00:00+08:00,deepseek-flash,deepseek-flash,***REDACTED***,***REDACTED***,request_count,,21
+***REDACTED***,2026-11-22T20:00:00+08:00,2026-11-22T21:00:00+08:00,deepseek-flash,deepseek-flash,***REDACTED***,***REDACTED***,output_tokens,0.000004,1950
