@@ -52,11 +52,11 @@ SELECT VERSION();
 - 补扫模拟在 `endAt+31.0s` 执行首轮扫描，完成 10/10。
 - 并发更新实测手动影响 1 行、自动影响 0 行，总计 1 次状态迁移。重复条件更新在 A、C、补扫轮次各影响 0 行。
 
-原始轮次数据、扫描日志、并发结果和复核查询分别见 `evidence/rounds.csv`、`evidence/scan.log`、`evidence/concurrency.txt`、`evidence/verification.txt`。
+原始轮次数据、扫描日志、并发结果和复核查询分别见 `evidence/rounds.csv`、`evidence/scan.txt`、`evidence/concurrency.txt`、`evidence/verification.txt`。
 
 ## ADR 回填
 
-实测建议：保留 30 秒定时扫描，学生请求只作为兜底；在本轮单实例和 10 份答卷规模下，A/C 均达到 `endAt+60s` 10/10，重复迁移为 0。当前仓库没有 `adr/ADR-002-exam-submit-idempotency.md`，本轮未新建 ADR 或代替负责人做架构决策。
+实测建议：保留 30 秒定时扫描，学生请求只作为兜底；在本轮单实例和 10 份答卷规模下，A/C 均达到 `endAt+60s` 10/10，重复迁移为 0。ADR-002 已在 `main` 并已接受（2026-11-23，PR #56）；本探针为其 SP-03 证据。
 
 ## 变更记录
 

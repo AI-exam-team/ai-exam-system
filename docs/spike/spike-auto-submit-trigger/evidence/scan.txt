@@ -1,0 +1,9 @@
+2026-11-18T16:29:54.3605570+08:00 label=A-fixedDelay paper=sp03-a submitted=10 closed=1
+2026-11-18T16:29:54.4675384+08:00 label=A-fixedDelay paper=sp03-a-control submitted=0 closed=1
+2026-11-18T16:29:54.5819461+08:00 label=A-fixedDelay paper=sp03-a-zero submitted=0 closed=1
+2026-11-18T16:32:56.0373664+08:00 label=C-fixedDelay paper=sp03-c submitted=9 closed=1
+2026-11-18T16:32:56.1449961+08:00 label=C-fixedDelay paper=sp03-c-control submitted=0 closed=1
+2026-11-18T16:32:56.2560485+08:00 label=C-fixedDelay paper=sp03-c-zero submitted=0 closed=1
+2026-11-18T16:34:46.5600419+08:00 label=restart-first-scan paper=sp03-restart submitted=10 closed=1
+2026-11-18T16:34:46.6694185+08:00 label=restart-first-scan paper=sp03-restart-control submitted=0 closed=1
+2026-11-18T16:34:46.7831278+08:00 label=restart-first-scan paper=sp03-restart-zero submitted=0 closed=1

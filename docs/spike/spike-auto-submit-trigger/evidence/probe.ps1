@@ -3,7 +3,7 @@ $script:mysql = 'D:\SQL2022\mysql8\mysql-8.0.46-winx64\bin\mysql.exe'
 if (-not $env:MYSQL_PWD) { throw 'Set MYSQL_PWD in this PowerShell session before running the probe.' }
 $script:evidence = 'D:\AI智能考试系统\docs\spike\spike-auto-submit-trigger\evidence'
 New-Item -ItemType Directory -Force -Path $script:evidence | Out-Null
-$script:logPath = Join-Path $script:evidence 'scan.log'
+$script:logPath = Join-Path $script:evidence 'scan.txt'
 $null = New-Item -ItemType File -Force -Path $script:logPath
 Clear-Content -LiteralPath $script:logPath
 $rounds = [System.Collections.Generic.List[object]]::new()
