@@ -128,7 +128,7 @@ T1 ─┬─ T2 ─────────────────────�
 | 分支规划表完整，命名规范 | ✅ | `plans/branch-plan.md`；`feature/issue-{N}-{desc}` |
 | PR 准入条件完整 | ✅ | `.github/pull_request_template.md` 覆盖课程 8 条 |
 | 全部 MVP1 任务录入 Projects | ✅ | Issue #39–#50 已录入 Project #2，均在 Backlog |
-| This Week 有卡片，Review 列已建 | ✅ | #51 在 This Week；D1/D3 卡已建并放入 This Week |
+| This Week 有卡片，Review 列已建 | ✅ | #51 与 D1 卡在 This Week；D3 卡已建并录入 Project #2 |
 | 每个任务有负责人，无「待定」 | ✅ | §2 与 §2.1 |
 | 未拆非 MVP1 模块 | ✅ | Non-Goals 见 §6 |
 
