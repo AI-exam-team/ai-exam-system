@@ -486,7 +486,7 @@ qbank  ◄──── exam  ◄──── grading
 
 #### 6.3.1 POST /api/v1/papers/{id}/publish — 发布考试
 
-> **实现状态：依赖 ADR-004 评审通过（提议）**——发布通过 qbank `PaperLifecyclePort.markPublished` 受控命令完成，exam 不直接写 `Paper` 表。
+> **实现状态：ADR-004 已接受（2026-11-23）**——发布通过 qbank `PaperLifecyclePort.markPublished` 受控命令完成，exam 不直接写 `Paper` 表。
 
 **请求**
 
@@ -530,7 +530,7 @@ qbank  ◄──── exam  ◄──── grading
 
 **对应 AC**：`module-02-exam.md` AC-1 / AC-8；FR-1、FR-2。
 
-> **Q-1 已由 ADR-004 裁决（提议）**：qbank 提供 `PaperLifecyclePort.markPublished(paperId, teacherId, startAt, endAt, publishedAt)` / `markClosed(paperId)` 受控命令；exam 只调用命令，不直接写 `Paper` 表。ADR-004 待 qbank / exam 评审后转已接受；6.3.1 / 6.3.8 按该命令描述。
+> **Q-1 已由 ADR-004 裁决（已接受，2026-11-23）**：qbank 提供 `PaperLifecyclePort.markPublished(paperId, teacherId, startAt, endAt, publishedAt)` / `markClosed(paperId)` 受控命令；exam 只调用命令，不直接写 `Paper` 表。6.3.1 / 6.3.8 按该命令描述。
 
 #### 6.3.2 GET /api/v1/exams?status=AVAILABLE — 学生可见考试列表
 
@@ -772,7 +772,7 @@ qbank  ◄──── exam  ◄──── grading
 
 #### 6.3.8 自动交卷触发方式（ADR-002 决策摘要）
 
-> **实现状态：依赖 ADR-004 / 6.5 评审通过（提议）**——`findDuePapers` / `markClosed` 与 `PaperForExam` 字段已由集成分支补齐。
+> **实现状态：ADR-004 已接受（2026-11-23）**——`findDuePapers` / `markClosed` 与 `PaperForExam` 字段已由集成分支补齐。
 
 > 完整取舍、并发 SQL 与失败语义见 `adr/ADR-002-exam-submit-idempotency.md`；本节只写 exam 接口可见的行为。
 
@@ -789,7 +789,7 @@ qbank  ◄──── exam  ◄──── grading
 | 参数（已回填） | 扫描间隔 30s、单批上限 200 份；SP-03 实测 10/10 在 10.1s 内完成、0 重复；零答卷关闭已用最小表验证，第 10 周在正式表复跑 |
 
 > 扫描入口改为 qbank `findDuePapers(now)`，不再只从 `answer_sheets` 出发；这样零答卷试卷也会被关闭。跨模块不直接读 `papers` 表（ADR-004）。
-> 6.5 已补 `PaperForExam` 的 `startAt` / `endAt` / `publishedAt` / `createdBy`；`findDuePapers` / `markClosed` 由 ADR-004 提供（提议，待评审）。
+> 6.5 已补 `PaperForExam` 的 `startAt` / `endAt` / `publishedAt` / `createdBy`；`findDuePapers` / `markClosed` 由 ADR-004 提供（已接受）。
 > **SP-02/SP-03 实测（2026-11-18）**：50 并发 × 10 轮每轮 1 次迁移；30s 扫描 + 惰性兜底 10/10，最大触发延迟 10.1s，0 重复；仅惰性 5/10 漏交。
 
 #### 6.3.9 数据流与风险
@@ -851,7 +851,7 @@ qbank  ◄──── exam  ◄──── grading
 
 | 编号 | 问题 | 影响 | 建议 |
 | --- | --- | --- | --- |
-| Q-1 | `Paper` 发布/关闭写路径 | 已由 ADR-004 裁决（提议）：qbank `markPublished` / `markClosed`，exam 调用 | 待 qbank / exam 评审后转已接受 |
+| Q-1 | `Paper` 发布/关闭写路径 | 已由 ADR-004 裁决（已接受，2026-11-23）：qbank `markPublished` / `markClosed`，exam 调用 | 已接受 |
 | Q-2 | G-01 是否要求试卷 `CLOSED` 后才能发布成绩？ | 决定是否需要 `ExamProgressForGrading` DTO | 李昕彤 + 左恩东在接口冻结前定 |
 | Q-3 | `PAPER_NOT_DRAFT` 错误码 | 5.1 已登记，待契约 v0.2 | 契约升版时转正式 |
 | Q-4 | 答案 `content` 长度上限 | 保存/交卷校验与 DB 字段 | SP-04 结论回填；暂定 20,000 字符 |
