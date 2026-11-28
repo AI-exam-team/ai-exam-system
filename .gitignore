@@ -64,6 +64,7 @@ credentials.json
 logs/
 *.log
 *.log.*
+docs/spike/**/evidence/runs/
 npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*

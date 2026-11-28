@@ -2,9 +2,9 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 版本 | v0.1 |
-| 状态 | 进行中（SP-02 / SP-03 已完成） |
-| 日期 | 2026-11-17 |
+| 版本 | v0.5 |
+| 状态 | SP-02 / SP-03 / SP-04 已完成；SP-01 实测证据在 PR #52 待评审 |
+| 日期 | 2026-11-28 |
 | 负责人 | 李昕彤（集成与契约） |
 | 依据 | `docs/spike/README.md`；`docs/architecture.md`；`docs/dependency.md`；ADR-003 |
 | 红线 | **探针代码只放 `docs/spike/`，禁止合并进 `src/` 或 `tests/`** |
@@ -18,12 +18,12 @@
 
 | 编号 | 主题 | 负责人 | 时间盒 | 目录 | 结论去向 |
 | --- | --- | --- | --- | --- | --- |
-| SP-01 | DeepSeek 结构化评分输出、延迟与费用 | 左恩东（主执行） / 王麒博（复核） | 1 天 | `docs/spike/spike-deepseek-grading/` | ADR-003、grading 接口设计 |
-| SP-02 | MySQL 并发交卷幂等 | 主执行 钱斓轩 / 复核 李昕彤 | 0.5 天 | `docs/spike/spike-mysql-submit-idempotency/` | ADR-002、exam 测试用例 |
-| SP-03 | 自动交卷触发方式与调度漂移 | 主执行 钱斓轩 / 复核 李昕彤 | 0.5 天 | `docs/spike/spike-auto-submit-trigger/` | ADR-002、exam 实现方案 |
-| SP-04 | 长文本答案与 utf8mb4 存储 | 主执行 周裔 / 复核 孙宇萱 | 0.5 天 | `docs/spike/spike-mysql-text-storage/` | qbank/exam 字段设计 |
+| SP-01 | DeepSeek 结构化评分输出、延迟与费用 | 左恩东（主执行） / 王麒博（复核） | 1 天 | `docs/spike/spike-deepseek-grading/` | 实测已提交 PR #52，待评审；数据见 PR 与专项 README |
+| SP-02 | MySQL 并发交卷幂等 | 主执行 钱斓轩 / 复核 李昕彤 | 0.5 天 | `docs/spike/spike-mysql-submit-idempotency/` | 已完成；MySQL 8.0.37，50 并发 × 10 轮，见专项 README |
+| SP-03 | 自动交卷触发方式与调度漂移 | 主执行 李昕彤 / 复核 钱斓轩 | 0.5 天 | `docs/spike/spike-auto-submit-trigger/` | 已完成；PowerShell 驱动 MySQL 8.0.46，非 Spring `@Scheduled`，见专项 README |
+| SP-04 | 长文本答案与 utf8mb4 存储 | 主执行 周裔 / 复核 孙宇萱 | 0.5 天 | `docs/spike/spike-mysql-text-storage/` | 已完成；MySQL 8，推荐 `MEDIUMTEXT`，见专项 README |
 
-排期建议：SP-01 与 SP-02 并行先做（分别卡住 grading 与 exam 的接口设计），SP-03、SP-04 在周三前完成。
+本计划为第 8 周历史计划。当前进度以本文件总览表和各专项 README 为准；SP-01 仍需完成 PR #52 评审。
 
 > 分工原则：每个探针先定 1 名主执行，另一人复核；**同一探针目录只由主执行修改**，复核人只看 diff、证据与结论，不并行编辑。主执行因故不能完成时，先在 Issue 中交接，再改目录。
 
@@ -191,3 +191,4 @@
 | v0.2 | 2026-11-18 | 钱斓轩 | 总览表统一为「主执行 / 复核」；补充 SP-02、SP-03 认领记录与分工原则；状态改为进行中 |
 | v0.3 | 2026-11-18 | 钱斓轩 | SP-02/SP-03 实验完成并回填结论；SP-03 主执行改为钱斓轩 / 复核李昕彤 |
 | v0.4 | 2026-11-18 | 周裔 | 完成 SP-04 长文本存储实验并回填结论；明确 MySQL 8 推荐使用 `MEDIUMTEXT`，字符截断情况已在 README 留痕 |
+| v0.5 | 2026-11-28 | 李昕彤 | 按已归档证据同步 SP-02/03/04 完成状态，并标记 SP-01 的 PR #52 评审状态；注明本文件为第 8 周历史计划 |

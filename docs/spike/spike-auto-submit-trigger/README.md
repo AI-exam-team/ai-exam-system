@@ -26,6 +26,8 @@ SELECT VERSION();
 -- 8.0.46
 ```
 
+历史实测使用的数据库名为 `spike`。为防止复跑时误删该库或覆盖归档证据，当前探针脚本改为仅连接本机 `127.0.0.1:3306` 上专用的 `sp03_probe` 数据库；运行前须自行创建此空实验库，并在当前 PowerShell 会话显式设置 `SP03_ALLOW_DESTRUCTIVE_RESET=YES`。脚本会校验当前数据库名和端口，再执行表重置；每次运行的日志和 CSV 写入 `evidence/runs/<时间戳>/` 独立目录，不覆盖本文件夹中的历史证据。`schema.sql` 仅建表，不含 `DROP TABLE`。
+
 用 PowerShell 脚本启动或停止当前用户的 MySQL 进程：
 
 ```powershell
