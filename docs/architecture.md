@@ -134,7 +134,7 @@ qbank  ◄──── exam  ◄──── grading
 
 ### 5.1 错误码
 
-既有错误码以 `spec/contract-v0.1.md` 第 5 节为唯一来源。集成层当前只登记以下**需要新增**的错误码（提交契约 v0.2 评审后生效）：
+已冻结错误码见相应契约版本。以下 grading 错误码为 `spec/contract-v0.3.md` 的候选扩展，待 grading / exam 模块评审后生效：
 
 | 错误码 | HTTP | 场景 | 产生模块 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -143,11 +143,19 @@ qbank  ◄──── exam  ◄──── grading
 | `PAPER_NOT_DRAFT` | 409 | 试卷当前状态不是 `DRAFT`（重复发布或已关闭） | qbank（经 exam 返回） | 待契约升版 |
 | `QUESTION_NOT_ACTIVE` | 409 | 组卷引用非 `ACTIVE` 题目 | qbank | 待契约升版 |
 | `QUESTION_ALREADY_USED` | 409 | 题目被任一 `PUBLISHED` 试卷引用，禁止修改 | qbank | 待契约升版 |
-| `ANSWER_NOT_SUBMITTED` | 409 | 对 `DRAFT` 答卷触发 AI 初评 | grading | 待契约升版 |
-| `AI_GRADING_IN_PROGRESS` | 409 | 同一题初评处于 `PENDING` 时重复触发 | grading | 待契约升版 |
-| `INVALID_REVIEWED_SCORE` | 400 | 确认分非整数或不在 `[0, 题目分值]` | grading | 待契约升版 |
+| `ANSWER_NOT_SUBMITTED` | 409 | 对 `DRAFT` 答卷触发 AI 初评或人工复核 | grading | v0.3 候选 |
+| `AI_GRADING_IN_PROGRESS` | 409 | 同一题初评处于 `PENDING` 时重复触发 | grading | v0.3 候选 |
+| `AI_ATTEMPT_LIMIT_REACHED` | 409 | 单题实际模型调用达到 3 次且没有成功结果可复用 | grading | v0.3 候选 |
+| `AI_RESULT_DISCARDED` | 409 | 教师先完成人工复核，AI 迟到结果被条件更新丢弃 | grading | v0.3 候选 |
+| `INVALID_REVIEWED_SCORE` | 400 | 确认分非整数或不在 `[0, 题目分值]` | grading | v0.3 候选 |
+| `PAPER_NOT_CLOSED` | 409 | 考试未关闭时请求发布成绩 | grading / exam | v0.3 候选 |
+| `NO_SUBMITTED_ANSWER_SHEETS` | 409 | 没有已提交答卷时请求发布成绩 | grading | v0.3 候选 |
+| `GRADE_NOT_FULLY_REVIEWED` | 409 | 任一已提交答卷仍有未确认题目 | grading | v0.3 候选 |
+| `GRADES_ALREADY_PUBLISHED` | 409 | 成绩发布后请求修改评分或重新触发 AI | grading | v0.3 候选 |
+| `AI_SERVICE_TIMEOUT` / `AI_SERVICE_UNAVAILABLE` | 502 | 模型超时 / 其他最终上游故障 | grading | v0.3 候选 |
+| `AI_OUTPUT_INVALID` / `AI_SCORE_OUT_OF_RANGE` | 502 | 输出结构不合法 / 可解析数值越界 | grading | v0.3 候选 |
 
-> 说明：G-03（错误码补齐）与本表合并处理；契约升版前不得在代码中先使用。
+> 说明：G-03（错误码补齐）与本表合并处理；契约 v0.3 评审冻结前不得在代码中先使用。
 
 ---
 
@@ -482,7 +490,7 @@ qbank  ◄──── exam  ◄──── grading
 
 > 本节字段由 exam 组确认；成功/失败分支、权限与 AC 映射按 6.3.1～6.3.7 逐接口写清。自动交卷触发方式见 6.3.8 与 ADR-002。
 > 身份字段（`studentId`、`createdBy`）一律取自 JWT `subject`，**不接受请求体传入**；跨模块 DTO 见 6.5 节。
-> 触发粒度（逐题 vs 整卷）待 G-08 决议；本表按单题幂等键设计，整卷批量不引入新的幂等语义。
+> 本表只覆盖 exam 接口；grading 初评触发粒度见下方 6.4 节。
 
 #### 6.3.1 POST /api/v1/papers/{id}/publish — 发布考试
 
@@ -844,7 +852,7 @@ qbank  ◄──── exam  ◄──── grading
 | 交卷方式 | `submitType` 区分 `MANUAL` / `AUTO`；`AUTO` 的 `submittedAt=endAt` | 评分逻辑不依赖 `submitType`，两者同等可评 |
 | 答案冻结 | 交卷后答案只读；重复交卷/保存不改变内容 | 只读消费，不回写答案 |
 | 时间权威 | `startedAt`、`savedAt`、`submittedAt` 全部为服务端时间 | 以 `submittedAt` 作为评分与审计时间 |
-| 试卷关闭 | `endAt` 后 `PUBLISHED → CLOSED`（qbank `markClosed`，ADR-004） | 若 G-01 要求关闭后才能发布成绩，需 exam 提供只读进度；当前 6.5 未定义，待 G-01 决议后补 DTO |
+| 试卷关闭 | `endAt` 后 `PUBLISHED → CLOSED`（qbank `markClosed`，ADR-004） | 发布前要求 `CLOSED`；grading 通过 exam 的 `ExamProgressForGrading` 只读 DTO 校验状态与已交答卷数 |
 | 教师视图 | `GET /papers/{id}/answer-sheets` 只给答卷摘要 | `GET /papers/{id}/grading-sheets` 给 AI/复核字段，二者不重复 |
 
 **跨模块决策与待确认项**
@@ -852,7 +860,7 @@ qbank  ◄──── exam  ◄──── grading
 | 编号 | 问题 | 影响 | 建议 |
 | --- | --- | --- | --- |
 | Q-1 | `Paper` 发布/关闭写路径 | 已由 ADR-004 裁决（已接受，2026-11-23）：qbank `markPublished` / `markClosed`，exam 调用 | 已接受 |
-| Q-2 | G-01 是否要求试卷 `CLOSED` 后才能发布成绩？ | 决定是否需要 `ExamProgressForGrading` DTO | 李昕彤 + 左恩东在接口冻结前定 |
+| Q-2 | grading 读取 `Paper.CLOSED` 与已提交答卷数的 DTO | `ExamProgressForGrading` 候选字段见 §6.5；exam owner 评审后冻结 | exam + grading + 集成 |
 | Q-3 | `PAPER_NOT_DRAFT` 错误码 | 5.1 已登记，待契约 v0.2 | 契约升版时转正式 |
 | Q-4 | 答案 `content` 长度上限 | 保存/交卷校验与 DB 字段 | SP-04 结论回填；暂定 20,000 字符 |
 | Q-5 | 自动交卷扫描间隔与漂移 | `endAt + 60s` 完成率 | 已由 SP-03 回填：30s / 单批 200，10/10 在 10.1s 内 |
@@ -865,18 +873,18 @@ qbank  ◄──── exam  ◄──── grading
 | 方法 | 路径 | 说明 | 成功 | 主要失败 |
 | --- | --- | --- | --- | --- |
 | GET | `/api/v1/papers/{id}/grading-sheets` | 教师查看逐题评分状态 | 200 `GradingSheetView[]` | 403（非本人试卷）、404 |
-| POST | `/api/v1/answer-sheets/{id}/questions/{questionId}/ai-grade` | 触发单题初评（整卷批量=循环调用） | 200 `GradeResult` | 409 `ANSWER_NOT_SUBMITTED` / `AI_GRADING_IN_PROGRESS`、502 `AI_SERVICE_TIMEOUT` / `AI_OUTPUT_INVALID` / `AI_SCORE_OUT_OF_RANGE` |
-| PUT | `/api/v1/answer-sheets/{id}/questions/{questionId}/review` | 教师复核并写确认分 | 200 `GradeResult` | 400 `INVALID_REVIEWED_SCORE`、403、404 |
-| POST | `/api/v1/papers/{id}/grades/publish` | 整场发布成绩 | 200 `{ publishedAt }` | 409 `GRADE_NOT_FULLY_REVIEWED`、403 |
+| POST | `/api/v1/answer-sheets/{id}/questions/{questionId}/ai-grade` | 同步触发单题初评；整卷操作由前端逐题调用 | 200 `GradeResult` | 409 `ANSWER_NOT_SUBMITTED` / `AI_GRADING_IN_PROGRESS` / `AI_ATTEMPT_LIMIT_REACHED` / `AI_RESULT_DISCARDED`、502 上游或输出错误 |
+| PUT | `/api/v1/answer-sheets/{id}/questions/{questionId}/review` | 教师复核并写确认分；PENDING 时允许人工抢先完成 | 200 `GradeResult` | 400 `INVALID_REVIEWED_SCORE`、403、404、409 `ANSWER_NOT_SUBMITTED` / `GRADES_ALREADY_PUBLISHED` |
+| POST | `/api/v1/papers/{id}/grades/publish` | Paper.CLOSED 且至少一份答卷全部复核后发布 | 200 `GradePublication`（重复请求返回原记录） | 409 `PAPER_NOT_CLOSED` / `NO_SUBMITTED_ANSWER_SHEETS` / `GRADE_NOT_FULLY_REVIEWED`、403 |
 | GET | `/api/v1/my/grades/{paperId}` | 学生查本人成绩 | 200 `PublishedGrade` | 403 `SCORE_NOT_PUBLISHED`、404 |
 
-> 触发粒度（逐题 vs 整卷）待 G-08 决议；本表按单题幂等键设计，整卷批量不引入新的幂等语义。
+> 候选规则：仅提供逐题 API；整卷入口由前端逐题调用，单题分别显示状态与失败，并作为幂等 / 重试单位。待 grading 组评审。
 
 #### 6.4.1 通用请求与响应约定
 
 - 路径 ID 均为非空字符串。以下接口无查询参数，除复核外无请求体。身份和角色只取自 JWT，不接受客户端传入 studentId、createdBy 或 reviewedBy。
 - 所有接口：JWT 缺失、无效或过期返回 401 UNAUTHORIZED；角色不符或资源不归属本人返回 403 FORBIDDEN；路径参数或请求体格式非法返回 400 VALIDATION_ERROR。错误体至少包含 { code: string, message: string }，并可包含统一响应约定中的 requestId。
-- 以下是第 9 周拆任务用的接口草案，新增错误码和审计字段见 [契约 v0.2 草案](https://github.com/AI-exam-team/ai-exam-system/blob/docs/issue-33-grading-contract/spec/contract-v0.2.md)。待契约评审及标注的未决行为确认后冻结。时间字段为带偏移量的 ISO 8601 字符串；以下 nullable 字段未产生时返回 null，空集合返回 []。
+- grading API 的评审草案见 [`spec/openapi.yaml`](../spec/openapi.yaml)，错误码与持久化语义见 [`spec/contract-v0.3.md`](../spec/contract-v0.3.md)。待 grading / exam owner 评审后冻结。时间字段为带偏移量的 ISO 8601 字符串；以下 nullable 字段未产生时返回 null，空集合返回 []。
 
 | 类型 | 字段及类型 |
 | --- | --- |
@@ -889,7 +897,7 @@ qbank  ◄──── exam  ◄──── grading
 #### 6.4.2 GET /api/v1/papers/{id}/grading-sheets
 
 - 请求：id 为试卷 ID。
-- 成功 200：GradingSheetView[]，每份 SUBMITTED 答卷一项，每道试卷题目一条，无评分记录显示 NOT_STARTED。此处明确总览表中的响应为列表，待接口评审确认。
+- 成功 200：GradingSheetView[]，每份 SUBMITTED 答卷一项，每道试卷题目一条，无评分记录显示 NOT_STARTED；无已提交答卷返回空数组。
 - 失败：404 PAPER_NOT_FOUND（试卷不存在）。无已提交答卷返回空数组。
 - 权限：教师，校验 Paper.createdBy 等于 JWT subject。
 - 对应 [module-03](../spec/module-03-grading.md) AC-1 / AC-12 / AC-14。
@@ -897,24 +905,26 @@ qbank  ◄──── exam  ◄──── grading
 #### 6.4.3 POST /api/v1/answer-sheets/{id}/questions/{questionId}/ai-grade
 
 - 请求：id 为答卷 ID，questionId 为该答卷所属试卷中的题目 ID。
-- 成功 200：GradeResult，校验成功后返回，已有 SUCCEEDED 则复用。按单题幂等，整卷操作入口仍待 G-08。
-- 失败：404 ANSWER_SHEET_NOT_FOUND（答卷不存在）；404 QUESTION_NOT_FOUND（题目不属于对应试卷）；409 ANSWER_NOT_SUBMITTED（答卷为 DRAFT）；409 AI_GRADING_IN_PROGRESS（该题处于 PENDING）；409 AI_ATTEMPT_LIMIT_REACHED（实际模型调用额度耗尽且无成功结果可复用）；409 AI_RESULT_DISCARDED（响应到达时已复核或尝试号失效）；502 AI_SERVICE_TIMEOUT（最终失败原因为模型超时）；502 AI_SERVICE_UNAVAILABLE（最终失败原因为非超时上游故障，如限流、连接异常或上游非成功响应）；502 AI_OUTPUT_INVALID（结构、评分点映射或评分一致性失败）；502 AI_SCORE_OUT_OF_RANGE（结构可校验但分数越界，优先于评分一致性检查）。新增映射待契约 v0.2 评审。
+- 成功 200：GradeResult，校验成功后返回，已有 SUCCEEDED 则复用。按单题幂等；整卷操作由前端逐题调用。
+- 失败：404 ANSWER_SHEET_NOT_FOUND（答卷不存在）；404 QUESTION_NOT_FOUND（题目不属于对应试卷）；409 ANSWER_NOT_SUBMITTED、AI_GRADING_IN_PROGRESS、AI_ATTEMPT_LIMIT_REACHED、AI_RESULT_DISCARDED 或 GRADES_ALREADY_PUBLISHED；502 AI_SERVICE_TIMEOUT、AI_SERVICE_UNAVAILABLE、AI_OUTPUT_INVALID 或 AI_SCORE_OUT_OF_RANGE。数值越界优先返回 AI_SCORE_OUT_OF_RANGE；其他结构与一致性问题返回 AI_OUTPUT_INVALID。详情以 contract v0.3 / OpenAPI 评审为准。
 - 权限：教师，通过答卷的 paperId 校验 Paper.createdBy 等于 JWT subject，再校验题目归属。模型失败后允许人工复核。
 - 对应 [module-03](../spec/module-03-grading.md) AC-1～AC-6 / AC-12～AC-14。
 
 #### 6.4.4 PUT /api/v1/answer-sheets/{id}/questions/{questionId}/review
 
-- 请求：路径参数同 6.4.3。请求体 { reviewedScore: integer（必填）, reviewComment?: string }。
+- 请求：路径参数同 6.4.3。请求体 `{ reviewedScore: integer（必填）, reviewComment?: string | null }`。缺少 `reviewComment` 时保留旧意见，传 `null` 清除。
 - 成功 200：GradeResult，包含确认分、JWT 对应教师 ID 和服务端复核时间，保留已有 AI 结果。
-- 失败：400 INVALID_REVIEWED_SCORE（确认分缺失、非整数或超出 [0, 题目分值]）；404 ANSWER_SHEET_NOT_FOUND（答卷不存在）；404 QUESTION_NOT_FOUND（题目不属于对应试卷）；409 ANSWER_NOT_SUBMITTED（草稿答卷，复用码待确认）。发布后能否改分待 G-02，未初评或初评中能否人工确认待 G-04。
+- 规则：NOT_STARTED / PENDING / SUCCEEDED / FAILED 均可复核。PENDING 时人工复核会条件终止当前 AI 尝试；其迟到响应不得覆盖确认分。发布前允许更新最新确认分；发布后评分锁定。
+- 失败：400 INVALID_REVIEWED_SCORE；404 ANSWER_SHEET_NOT_FOUND 或 QUESTION_NOT_FOUND；409 ANSWER_NOT_SUBMITTED 或 GRADES_ALREADY_PUBLISHED。
 - 权限：教师，通过答卷所属试卷校验 Paper.createdBy 等于 JWT subject，并校验题目归属。
 - 对应 [module-03](../spec/module-03-grading.md) AC-6～AC-8 / AC-12～AC-14。
 
 #### 6.4.5 POST /api/v1/papers/{id}/grades/publish
 
 - 请求：id 为试卷 ID。
-- 成功 200：{ publishedAt: datetime }，整场原子发布，按确认分汇总。重复请求不得改变成绩，原发布时间的返回规则待 G-02。
-- 失败：404 PAPER_NOT_FOUND（试卷不存在）；409 GRADE_NOT_FULLY_REVIEWED（任一已提交答卷存在未确认题目，0 分为有效确认）。是否必须等考试结束及无答卷时的行为待 G-01。
+- 成功 200：`GradePublication { paperId, publishedAt, publishedBy }`，成绩按确认分汇总；重复请求返回原记录和原时间。
+- 失败：404 PAPER_NOT_FOUND；409 PAPER_NOT_CLOSED、NO_SUBMITTED_ANSWER_SHEETS 或 GRADE_NOT_FULLY_REVIEWED。
+- 持久化：每张试卷至多一条 grading 自有 `GradePublication` 记录；READY 由 CLOSED / 答卷 / 复核数据推导。发布后分数锁定。
 - 权限：教师，校验 Paper.createdBy 等于 JWT subject。
 - 对应 [module-03](../spec/module-03-grading.md) AC-9 / AC-10 / AC-12 / AC-13。
 
@@ -922,7 +932,7 @@ qbank  ◄──── exam  ◄──── grading
 
 - 请求：paperId 为试卷 ID。
 - 成功 200：PublishedGrade，仅返回本人确认分、教师意见和总分。
-- 失败：404 ANSWER_SHEET_NOT_FOUND（按 JWT 身份和 paperId 查无本人已提交答卷）；403 SCORE_NOT_PUBLISHED（有本人已提交答卷但整场成绩未发布）。不得根据其他学生是否交卷改变响应。
+- 失败：404 ANSWER_SHEET_NOT_FOUND（按 JWT 身份和 paperId 查无本人已提交答卷）；403 SCORE_NOT_PUBLISHED（本人有答卷但无对应 `GradePublication` 记录）。不得根据其他学生是否交卷改变响应。
 - 权限：学生，按 (paperId, JWT subject) 查本人答卷。
 - 对应 [module-03](../spec/module-03-grading.md) AC-10 / AC-11 / AC-12。
 
@@ -935,6 +945,7 @@ qbank  ◄──── exam  ◄──── grading
 | qbank → exam | `PaperForExam { paperId, title, totalScore, status, startAt, endAt, publishedAt, createdBy, items[{questionId, order, score, type, stem}] }` | 不包含参考答案与评分点；`exam` 发布时重新校验分值；qbank 侧由 `paper_items` 快照组装，`DRAFT` 用基线快照，`PUBLISHED` / `CLOSED` 用冻结的正式快照（待 ADR-001 通过）；`createdBy` 仅供进程内归属校验，不返回学生端 |
 | qbank → grading | `QuestionForGrading { paperId, questionId, type, stem, referenceAnswer, totalScore, rubric[{rubricItemId, description, score, order}] }` | 只读；使用答卷所属的 `paperId` 与 `questionId` 作为组合键定位试卷快照，禁止回退按题目 ID 读取其他试卷的快照或当前题库内容（待 ADR-001 通过） |
 | exam → grading | `SubmittedSheetForGrading { answerSheetId, paperId, studentId, submittedAt, submitType, answers[{questionId, content}] }` | 仅 `SUBMITTED`；只读，不改变答案与时间 |
+| exam → grading | `ExamProgressForGrading { paperId, status, submittedAnswerSheetCount }` | 只读；用于发布前确认 Paper 为 `CLOSED` 且至少一份答卷已提交；由 exam owner 评审后冻结 |
 | grading → 学生端 | `PublishedGrade { paperId, totalScore, items[{questionId, reviewedScore, reviewComment}] }` | 仅成绩发布后；不返回 `aiScore` / `aiReason` / `rubricHits` |
 | grading → 教师端 | `GradingSheetView { answerSheetId, items[{questionId, aiStatus, rubricHits, aiScore, aiReason, reviewedScore, reviewComment, reviewedAt}] }` | 仅试卷创建教师可见 |
 
@@ -945,6 +956,7 @@ qbank  ◄──── exam  ◄──── grading
 | `PaperLifecyclePort.markPublished(paperId, teacherId, startAt, endAt, publishedAt)` | qbank | exam | 校验归属、`DRAFT`、非空、总分、窗口；写状态与窗口并冻结基线快照；返回 `PaperForExam` |
 | `PaperLifecyclePort.markClosed(paperId)` | qbank | exam | 仅 `PUBLISHED → CLOSED`；已 `CLOSED` 按幂等处理 |
 | `PaperDueQueryPort.findDuePapers(now)` | qbank | exam | 只读返回 `status=PUBLISHED && endAt <= now` 的 `[{paperId, endAt}]`，供自动交卷按“到期试卷”扫描 |
+| `ExamProgressQueryPort.getProgressForGrading(paperId)` | exam | grading | 候选只读返回 `ExamProgressForGrading { paperId, status, submittedAnswerSheetCount }`，供成绩发布校验；由 exam owner 评审后冻结 |
 
 约束：
 
@@ -1023,7 +1035,7 @@ qbank  ◄──── exam  ◄──── grading
 | --- | --- | --- | --- | --- |
 | ADR-001 | 已发布试卷取题目快照还是引用（基线快照 + 发布冻结） | C-01 | 孙宇萱（qbank） | 已接受（2026-11-23） |
 | ADR-002 | 交卷并发与自动交卷幂等 | C-03 | 钱斓轩（exam） | 已接受（2026-11-23） |
-| ADR-003 | AI 初评调用、超时重试与幂等 | C-06 | 李昕彤 + grading | 本 PR 提交（提议） |
+| ADR-003 | AI 初评调用、超时重试与幂等 | C-06、G-08 | 李昕彤 + grading | 候选方案待 grading / exam 评审 |
 | ADR-004 | Paper 发布/关闭的跨模块写路径（qbank 受控命令） | Q-1 | 李昕彤 | 提议（待 qbank / exam 评审） |
 
 仍在开放的问题：
@@ -1033,9 +1045,9 @@ qbank  ◄──── exam  ◄──── grading
 | Q-1 | Paper 发布/关闭的跨模块写路径 | 李昕彤 + 孙宇萱 / 钱斓轩 | ADR-004（提议，待评审） |
 | C-02 | ID 格式（UUID / 雪花 / 自增） | 李昕彤 | 第 8 周 ADR 或架构附录 |
 | C-04 | AI 返回 JSON 物理字段与 schema | 王麒博 + 李昕彤 | 随 ADR-003 定稿 |
-| G-01 | 成绩发布是否必须等考试 `CLOSED` | 钱斓轩 + 左恩东 + 李昕彤 | 接口冻结前 |
-| G-02 | 发布后是否允许改分 / 重复发布语义 | 左恩东 + 李昕彤 | 接口冻结前 |
-| G-06 | 成绩发布状态如何存储与判定 | 李昕彤 + 左恩东 | 接口冻结前 |
+| G-01 | 发布要求 `CLOSED`、至少一份已交答卷且全部复核（候选已选） | exam + grading + 李昕彤 | 模块评审后冻结 |
+| G-02 | 发布后锁分；重复发布返回原时间（候选已选） | grading + 李昕彤 | 模块评审后冻结 |
+| G-06 | 使用唯一 `GradePublication` 记录表达发布（候选已选） | grading + 李昕彤 | 模块评审后冻结 |
 | TBD-07/08 | 并发与费用上限、JWT 有效期 | 李昕彤 | 第 8 周内给出数值 |
 
 ---

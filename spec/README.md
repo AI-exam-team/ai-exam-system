@@ -15,6 +15,8 @@
 | `README.md` | 本文件：目录规则 |
 | `spec-vX.Y.md` | 全局规格骨架/总览（当前 `spec-v0.1.md`） |
 | `<module>-spec-vX.Y.md` | 模块规格，`<module>` ∈ `qbank` / `exam` / `grading` |
+| `contract-vX.Y.md` | 跨模块实体、错误码与状态契约 |
+| `openapi.yaml` | HTTP API 契约；当前 v0.3 草案覆盖 grading endpoints，qbank / exam 待各组评审冻结后补齐 |
 
 约定：
 

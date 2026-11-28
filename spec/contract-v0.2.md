@@ -1,5 +1,7 @@
 # 跨模块契约 v0.2（grading 增量草案）
 
+> 历史草案：已由 [`contract-v0.3.md`](./contract-v0.3.md) 更新；v0.3 通过评审前，本文件不作为实现依据。
+
 状态：待集成、grading 与受影响模块评审，接口暂不冻结。
 关联 [Issue #33](https://github.com/AI-exam-team/ai-exam-system/issues/33)。本文拟补充 [v0.1](contract-v0.1.md)，其余规则沿用 v0.1。
 
