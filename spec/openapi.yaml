@@ -1,0 +1,356 @@
+openapi: 3.1.0
+info:
+  title: AI Exam System API - Grading
+  version: 0.3.0
+  description: >-
+    MVP1 grading endpoints. This is a review draft for the grading module;
+    dated 2026-11-28 and associated with Issue #33. The integration lead has
+    selected these candidate defaults; grading and exam module review is pending.
+    qbank and exam endpoints will be added after their contracts are frozen.
+  x-owner: Integration and grading module reviewers
+  x-status: Review draft; not frozen
+  x-issue: https://github.com/AI-exam-team/ai-exam-system/issues/33
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/papers/{paperId}/grading-sheets:
+    get:
+      operationId: listPaperGradingSheets
+      summary: List submitted answer sheets and grading states for a paper
+      parameters:
+        - $ref: '#/components/parameters/PaperId'
+      responses:
+        '200':
+          description: Grading states for submitted answer sheets; an empty list is valid.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GradingSheetView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: PAPER_NOT_FOUND
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/answer-sheets/{answerSheetId}/questions/{questionId}/ai-grade:
+    post:
+      operationId: gradeAnswerSheetQuestion
+      summary: Synchronously request or reuse the AI suggestion for one question
+      description: >-
+        The idempotency key is answerSheetId + questionId. Success returns 200,
+        including when an existing SUCCEEDED result is reused. No request body is accepted.
+      parameters:
+        - $ref: '#/components/parameters/AnswerSheetId'
+        - $ref: '#/components/parameters/QuestionId'
+      responses:
+        '200':
+          description: New successful result or previously stored successful result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GradeResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: >-
+            ANSWER_NOT_SUBMITTED, AI_GRADING_IN_PROGRESS,
+            AI_ATTEMPT_LIMIT_REACHED, AI_RESULT_DISCARDED, or GRADES_ALREADY_PUBLISHED.
+          $ref: '#/components/responses/Conflict'
+        '502':
+          description: AI_SERVICE_TIMEOUT, AI_SERVICE_UNAVAILABLE, AI_OUTPUT_INVALID, or AI_SCORE_OUT_OF_RANGE.
+          $ref: '#/components/responses/UpstreamFailure'
+
+  /api/v1/answer-sheets/{answerSheetId}/questions/{questionId}/review:
+    put:
+      operationId: reviewAnswerSheetQuestion
+      summary: Save or update the teacher's confirmed score for one question
+      description: >-
+        Review is allowed in any aiStatus before publication, including PENDING.
+        A review that wins while AI is pending invalidates that attempt; a late AI
+        response cannot replace the confirmed score. Revisions are locked after publication.
+      parameters:
+        - $ref: '#/components/parameters/AnswerSheetId'
+        - $ref: '#/components/parameters/QuestionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewRequest'
+      responses:
+        '200':
+          description: Saved grading result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GradeResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: ANSWER_NOT_SUBMITTED or GRADES_ALREADY_PUBLISHED.
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/papers/{paperId}/grades/publish:
+    post:
+      operationId: publishPaperGrades
+      summary: Publish all reviewed grades for a closed paper
+      description: >-
+        Publication requires Paper.CLOSED, at least one submitted answer sheet,
+        and a confirmed score for every question in every submitted answer sheet.
+        Repeated publication is idempotent and returns the original publishedAt.
+      parameters:
+        - $ref: '#/components/parameters/PaperId'
+      responses:
+        '200':
+          description: Existing or newly created grade publication record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GradePublication'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: PAPER_NOT_CLOSED, NO_SUBMITTED_ANSWER_SHEETS, or GRADE_NOT_FULLY_REVIEWED.
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/my/grades/{paperId}:
+    get:
+      operationId: getMyPublishedGrade
+      summary: Get the authenticated student's published grade for one paper
+      parameters:
+        - $ref: '#/components/parameters/PaperId'
+      responses:
+        '200':
+          description: The student's confirmed scores and total; AI internals are omitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishedGrade'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: FORBIDDEN or SCORE_NOT_PUBLISHED.
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    PaperId:
+      name: paperId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    AnswerSheetId:
+      name: answerSheetId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    QuestionId:
+      name: questionId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    BadRequest:
+      description: VALIDATION_ERROR or INVALID_REVIEWED_SCORE.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: UNAUTHORIZED.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Forbidden:
+      description: FORBIDDEN or SCORE_NOT_PUBLISHED.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: PAPER_NOT_FOUND, ANSWER_SHEET_NOT_FOUND, or QUESTION_NOT_FOUND.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Conflict:
+      description: A grading or publication precondition was not met.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    UpstreamFailure:
+      description: AI provider or output validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+  schemas:
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - INVALID_REVIEWED_SCORE
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - SCORE_NOT_PUBLISHED
+            - PAPER_NOT_FOUND
+            - ANSWER_SHEET_NOT_FOUND
+            - QUESTION_NOT_FOUND
+            - ANSWER_NOT_SUBMITTED
+            - AI_GRADING_IN_PROGRESS
+            - AI_ATTEMPT_LIMIT_REACHED
+            - AI_RESULT_DISCARDED
+            - PAPER_NOT_CLOSED
+            - NO_SUBMITTED_ANSWER_SHEETS
+            - GRADE_NOT_FULLY_REVIEWED
+            - GRADES_ALREADY_PUBLISHED
+            - AI_SERVICE_TIMEOUT
+            - AI_SERVICE_UNAVAILABLE
+            - AI_OUTPUT_INVALID
+            - AI_SCORE_OUT_OF_RANGE
+        message:
+          type: string
+        requestId:
+          type: [string, 'null']
+    RubricHit:
+      type: object
+      required: [rubricItemId, hit, score, reason]
+      properties:
+        rubricItemId:
+          type: string
+        hit:
+          type: boolean
+        score:
+          type: integer
+          minimum: 0
+        reason:
+          type: string
+    GradeResult:
+      type: object
+      required: [id, answerSheetId, questionId, aiStatus, rubricHits, aiScore, aiReason, reviewedScore, reviewedBy, reviewedAt, reviewComment]
+      properties:
+        id:
+          type: string
+        answerSheetId:
+          type: string
+        questionId:
+          type: string
+        aiStatus:
+          type: string
+          enum: [NOT_STARTED, PENDING, SUCCEEDED, FAILED]
+        rubricHits:
+          type: array
+          items:
+            $ref: '#/components/schemas/RubricHit'
+        aiScore:
+          type: [integer, 'null']
+          minimum: 0
+        aiReason:
+          type: [string, 'null']
+        reviewedScore:
+          type: [integer, 'null']
+          minimum: 0
+        reviewedBy:
+          type: [string, 'null']
+        reviewedAt:
+          type: [string, 'null']
+          format: date-time
+        reviewComment:
+          type: [string, 'null']
+    GradingSheetView:
+      type: object
+      required: [answerSheetId, items]
+      properties:
+        answerSheetId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/GradeResult'
+    ReviewRequest:
+      type: object
+      required: [reviewedScore]
+      properties:
+        reviewedScore:
+          type: integer
+          minimum: 0
+          description: Must not exceed the question's maximum score.
+        reviewComment:
+          type: [string, 'null']
+          description: Omitted preserves the current comment; null clears it.
+    GradePublication:
+      type: object
+      required: [paperId, publishedAt, publishedBy]
+      properties:
+        paperId:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        publishedBy:
+          type: string
+    PublishedGrade:
+      type: object
+      required: [paperId, totalScore, items]
+      properties:
+        paperId:
+          type: string
+        totalScore:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            type: object
+            required: [questionId, reviewedScore, reviewComment]
+            properties:
+              questionId:
+                type: string
+              reviewedScore:
+                type: integer
+                minimum: 0
+              reviewComment:
+                type: [string, 'null']
