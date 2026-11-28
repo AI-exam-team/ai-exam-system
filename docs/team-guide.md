@@ -4,7 +4,7 @@
 >
 > 仓库：<https://github.com/AI-exam-team/ai-exam-system>  
 > 看板：<https://github.com/orgs/AI-exam-team/projects/2>  
-> 当前阶段：第 6 周「上下文搭建」，禁止正式业务代码。
+> 状态更新于 2026-11-28：第 9 周任务拆解已归档，MVP1 实现尚未开始；当前任务状态以 [`plans/mvp1-plan.md`](../plans/mvp1-plan.md) 为准。
 
 ---
 
@@ -364,21 +364,14 @@ git push -u origin HEAD
 
 ---
 
-## 十七、本周（第 6 周）红线与待办
+## 十七、当前协作入口与待确认项
 
-**红线：**
-
-- 不写正式业务代码，只允许 `docs/spike/` 技术探针。
-- 空 PR #1 只改 `README.md` 一行。
-- 不直接 push `main`。
-
-**待办：**
-
-- 组员接受组织邀请，clone 仓库。
-- 阅读 `context.md` 与 `agent-rules.md`。
-- 一名非作者评审 PR #1：<https://github.com/AI-exam-team/ai-exam-system/pull/1>
-- 周会确认六人三组分工与 `CODEOWNERS` 用户名。
-- 继续完善看板字段、Workflows 与成员访问权限。
+- MVP1 任务状态、负责人和验收条件：[`plans/mvp1-plan.md`](../plans/mvp1-plan.md)。
+- 当前模块负责人和评审约定：[`plans/module-ownership.md`](../plans/module-ownership.md) 与 [`plans/roles.md`](../plans/roles.md)。
+- SP-01 实测证据 PR：[#52](https://github.com/AI-exam-team/ai-exam-system/pull/52)，仍待完成评审。
+- `.github/CODEOWNERS` 中的前端负责人仍待小组确认；确认前不要把占位名当作有效 owner。
+- `main` 分支保护与 CI 是否已在 GitHub 设置中启用，应由仓库管理员核实；文档要求本身不代表远端门禁已经生效。
+- 第 6 周验收和空 PR 演练仅作为历史记录，见 [`docs/week6-acceptance.md`](./week6-acceptance.md) 与 [`docs/pr-rehearsal.md`](./pr-rehearsal.md)。
 
 ---
 

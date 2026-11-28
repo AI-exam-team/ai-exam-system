@@ -2,7 +2,7 @@
 
 本目录用于记录技术预研（spike）活动。技术探针的目标是**在投入正式实现前降低不确定性**，不是交付业务功能。
 
-> 第 6 周仓库不包含业务代码；本规范先行，第 7 周起按此执行。
+> 本规范适用于后续技术预研；第 6 周验收记录见 [`../week6-acceptance.md`](../week6-acceptance.md)。
 
 ## 一、什么情况需要开探针
 
@@ -68,10 +68,10 @@ docs/spike/spike-<topic>/
 
 | 编号 | 主题 | 目录 | 负责人 | 状态 | 结论 |
 | --- | --- | --- | --- | --- | --- |
-| SP-01 | DeepSeek 结构化评分输出、延迟与费用 | `docs/spike/spike-deepseek-grading/` | 左恩东 / 王麒博 | 计划中 | - |
-| SP-02 | MySQL 并发交卷幂等 | `docs/spike/spike-mysql-submit-idempotency/` | 钱斓轩 | 计划中 | - |
+| SP-01 | DeepSeek 结构化评分输出、延迟与费用 | `docs/spike/spike-deepseek-grading/` | 左恩东 / 王麒博 | 证据已提交，PR #52 待评审 | 21 次调用；结构校验 21/21，P95 0.794 秒；见 PR #52 |
+| SP-02 | MySQL 并发交卷幂等 | `docs/spike/spike-mysql-submit-idempotency/` | 钱斓轩 / 李昕彤 | 已完成（MySQL 8.0.37） | 50 并发 × 10 轮，每轮 1 次状态迁移；见专项 README |
 | SP-03 | 自动交卷触发方式与调度漂移 | `docs/spike/spike-auto-submit-trigger/` | 李昕彤 / 钱斓轩 | 实测已完成（PowerShell 探针） | A/C：10/10 于 endAt+60s 内完成，0 重复更新；见 SP-03 README/evidence |
-| SP-04 | 长文本答案与 utf8mb4 存储 | `docs/spike/spike-mysql-text-storage/` | 周裔（主执行） / 孙宇萱（复核） | 有条件可行（待 MySQL 8 重跑） | SQL Server 初步；MySQL 待验证 |
+| SP-04 | 长文本答案与 utf8mb4 存储 | `docs/spike/spike-mysql-text-storage/` | 周裔 / 孙宇萱 | 已完成（MySQL 8） | `MEDIUMTEXT` 支持 50KB；建议输入上限 20,000 字符；见专项 README |
 
 ## 七、已确认事项
 

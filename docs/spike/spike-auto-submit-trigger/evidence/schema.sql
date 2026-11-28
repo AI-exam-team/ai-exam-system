@@ -1,6 +1,6 @@
-DROP TABLE IF EXISTS answer_items;
-DROP TABLE IF EXISTS answer_sheets;
-DROP TABLE IF EXISTS papers;
+-- Non-destructive setup only. Use the guarded probe.ps1 for a destructive reset.
+-- This file intentionally targets a dedicated local database.
+USE sp03_probe;
 
 CREATE TABLE papers (
   id         VARCHAR(36) NOT NULL PRIMARY KEY,

@@ -47,6 +47,9 @@
 ### 3.2 最小表
 
 ```sql
+-- 仅在专用、可丢弃的本地实验库中执行；不要连接生产或共享数据库。
+USE sp02_probe;
+
 DROP TABLE IF EXISTS answer_sheets;
 
 CREATE TABLE answer_sheets (

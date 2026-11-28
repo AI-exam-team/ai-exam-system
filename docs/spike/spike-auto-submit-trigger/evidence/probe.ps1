@@ -1,15 +1,18 @@
 $ErrorActionPreference = 'Stop'
 $script:mysql = 'D:\SQL2022\mysql8\mysql-8.0.46-winx64\bin\mysql.exe'
 if (-not $env:MYSQL_PWD) { throw 'Set MYSQL_PWD in this PowerShell session before running the probe.' }
-$script:evidence = 'D:\AI智能考试系统\docs\spike\spike-auto-submit-trigger\evidence'
-New-Item -ItemType Directory -Force -Path $script:evidence | Out-Null
-$script:logPath = Join-Path $script:evidence 'scan.txt'
-$null = New-Item -ItemType File -Force -Path $script:logPath
-Clear-Content -LiteralPath $script:logPath
+$script:database = 'sp03_probe'
+if ($env:SP03_ALLOW_DESTRUCTIVE_RESET -cne 'YES') {
+  throw 'This probe resets tables. Create the dedicated sp03_probe database, then set SP03_ALLOW_DESTRUCTIVE_RESET=YES to acknowledge the reset.'
+}
+$script:evidence = Join-Path $PSScriptRoot 'runs'
+$script:runId = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
+$script:runEvidence = Join-Path $script:evidence $script:runId
+$script:logPath = Join-Path $script:runEvidence 'scan.txt'
 $rounds = [System.Collections.Generic.List[object]]::new()
 
 function Invoke-Db([string]$sql) {
-  $out = @(& $script:mysql --protocol=TCP --host=127.0.0.1 --user=root --database=spike --batch --skip-column-names -e $sql 2>&1)
+  $out = @(& $script:mysql --protocol=TCP --host=127.0.0.1 --port=3306 --user=root "--database=$script:database" --batch --skip-column-names -e $sql 2>&1)
   if ($LASTEXITCODE -ne 0) { throw "MySQL command failed: $($out -join ' ')" }
   return ($out -join "`n").Trim()
 }
@@ -43,8 +46,15 @@ function Wait-To([datetime]$time) {
   if ($seconds -gt 0) { Start-Sleep -Seconds $seconds }
 }
 
+$identity = Invoke-Db "SELECT CONCAT(DATABASE(),'|',@@port);"
+$identityParts = $identity -split '\|'
+if ($identityParts.Count -ne 2 -or $identityParts[0] -cne $script:database -or [int]$identityParts[1] -ne 3306) {
+  throw "Refusing destructive reset: expected local database $script:database on port 3306, got '$identity'."
+}
 $version = Invoke-Db 'SELECT VERSION();'
 $mysqlNow = Invoke-Db "SELECT DATE_FORMAT(NOW(3),'%Y-%m-%d %H:%i:%s.%f');"
+if (Test-Path -LiteralPath $script:runEvidence) { throw "Refusing to overwrite existing evidence directory: $script:runEvidence" }
+New-Item -ItemType Directory -Force -Path $script:runEvidence | Out-Null
 Invoke-Db 'DROP TABLE IF EXISTS answer_items; DROP TABLE IF EXISTS answer_sheets; DROP TABLE IF EXISTS papers;'
 $ddl = "CREATE TABLE papers (id VARCHAR(36) NOT NULL PRIMARY KEY,status VARCHAR(16) NOT NULL,start_at DATETIME(3) NOT NULL,end_at DATETIME(3) NOT NULL,created_by VARCHAR(36) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; CREATE TABLE answer_sheets (id VARCHAR(36) NOT NULL PRIMARY KEY,paper_id VARCHAR(36) NOT NULL,student_id VARCHAR(36) NOT NULL,status VARCHAR(16) NOT NULL,started_at DATETIME(3) NOT NULL,submitted_at DATETIME(3) NULL,submit_type VARCHAR(8) NULL,UNIQUE KEY uk_answer_sheet_paper_student (paper_id,student_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; CREATE TABLE answer_items (answer_sheet_id VARCHAR(36) NOT NULL,question_id VARCHAR(36) NOT NULL,content MEDIUMTEXT NOT NULL,saved_at DATETIME(3) NOT NULL,PRIMARY KEY (answer_sheet_id,question_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
 Invoke-Db $ddl
@@ -54,10 +64,11 @@ Invoke-Db $ddl
 - MySQL 当前时间：$mysqlNow
 - 安装目录：D:\SQL2022\mysql8\mysql-8.0.46-winx64
 - 数据目录：D:\SQL2022\mysql8\data
-- 连接：127.0.0.1:3306 / spike
+- 连接：127.0.0.1:3306 / $script:database
+- 证据目录：$script:runEvidence
 - 执行方式：PowerShell fixedDelay 30s 扫描循环 + MySQL 8 条件更新
 - 运行日期：$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss zzz')
-"@ | Set-Content -LiteralPath (Join-Path $script:evidence 'environment.md') -Encoding utf8
+"@ | Set-Content -LiteralPath (Join-Path $script:runEvidence 'environment.md') -Encoding utf8
 
 # A: fixed-delay scheduler only
 Add-Fixture 'sp03-a'
@@ -105,7 +116,6 @@ $restart = Count-Results 'sp03-restart'
 $restartPaper = Invoke-Db "SELECT status FROM papers WHERE id='sp03-restart';"
 $rounds.Add([pscustomobject]@{ Round='4'; Plan='Restart'; DraftTotal=10; CompletedByEndAtPlus60=$restart.Submitted; RepeatedMigrations=0; ZeroPaperClosed='n/a'; RestartRescan="$restartPaper on first scan; draft=$($restart.Draft)"; Notes="first scan at endAt+30s; auto=$($restart.Auto); wrongSubmittedAt=$($restart.WrongSubmittedAt)" })
 
-$rounds | Export-Csv -LiteralPath (Join-Path $script:evidence 'rounds.csv') -NoTypeInformation -Encoding utf8
-Remove-Item Env:\MYSQL_PWD -ErrorAction SilentlyContinue
+$rounds | Export-Csv -LiteralPath (Join-Path $script:runEvidence 'rounds.csv') -NoTypeInformation -Encoding utf8
 Write-Output "version=$version"
 $rounds | Format-Table -AutoSize

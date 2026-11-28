@@ -2,18 +2,11 @@
 
 上海师范大学软件工程课程项目。面向高校课程场景的 AI 辅助主观题考试系统：教师建题组卷并发布考试，学生在线上作答，系统调用大模型完成主观题初评，教师进行最终复核。
 
-## 第 6 周状态：上下文搭建（不写业务代码）
+## 当前项目状态（2026-11-28）
 
-本周为项目启动周，红线要求：**禁止编写任何正式业务代码**。仓库当前处于“上下文搭建”阶段，本周产出限定为：
+需求、模块规格、架构决策、技术探针与 MVP1 任务计划已归档；项目尚未进入业务实现阶段。`src/` 与 `tests/` 目前只有占位文件，MVP1 计划中的 12 项任务仍为 Backlog，因此当前仓库还不能构建或演示可运行的考试系统。
 
-- 独立 Git 仓库与标准目录骨架
-- 项目上下文文档（`context.md`）
-- AI 协作规则（`agent-rules.md`）
-- 规格说明与 ADR
-- 看板与分支协作方案
-- 空 PR 协作演练
-
-`src/` 与 `tests/` 目前仅保留 `.gitkeep` 占位，不包含任何业务代码。
+接口和阅卷方案仍有待评审：grading 契约 v0.2 是草案，ADR-003 仍为提议，OpenAPI 文件尚未建立。SP-01 实测资料在 PR #52 中等待评审；SP-02、SP-03、SP-04 的探针结论已记录在各自 README 与 `docs/spike/plan.md`。
 
 ## 目录地图
 
@@ -26,8 +19,8 @@
 ├── spec/                         # 需求与规格说明（SRS、各模块 spec）
 ├── adr/                          # 架构决策记录（Architecture Decision Records）
 ├── plans/                        # 迭代计划、技术方案与实施计划
-├── src/                          # 源码目录（第 6 周仅 .gitkeep 占位，禁止业务代码）
-├── tests/                        # 测试目录（第 6 周仅 .gitkeep 占位）
+├── src/                          # 业务实现尚未开始；目前只有占位文件
+├── tests/                        # 自动化测试实现尚未开始；目前只有占位文件
 ├── docs/
 │   ├── spike/                    # 技术探针（技术预研）记录
 │   ├── reference/                # 原始资料归档（课程资料、外部参考）
@@ -108,7 +101,7 @@
 2. **PR 绑定 Issue**：每个 PR 必须在描述中关联至少一个 Issue（`Closes #<编号>`），并在模板中填写关联 spec、变更摘要、AI 工具使用说明、测试证据与评审清单。
 3. **Issue 先行**：任务使用 `task` 模板，缺陷使用 `bug` 模板；明确业务背景、验收标准、负责人与模块标签。
 4. **规格对齐**：涉及需求变更的 PR 必须同步更新 `spec/`；架构层面的取舍需新增或更新 `adr/`。
-5. **代码边界**：第 6 周不得提交业务代码；后续实现须遵守 `agent-rules.md` 中的 AI 协作约定。
+5. **代码边界**：实现范围与任务顺序以当前评审通过的 spec、ADR 和 MVP1 计划为准；AI 协作遵守 `agent-rules.md`。
 6. **评审**：至少 1 名非作者评审通过后方可合并；目录负责人见 `.github/CODEOWNERS`。
 
 ## 远端与协作入口
@@ -117,20 +110,12 @@
 - 看板：<https://github.com/orgs/AI-exam-team/projects/2>
 - 空 PR：<https://github.com/AI-exam-team/ai-exam-system/pull/1>
 
-当前已推送 `main` 与四条文档分支，Issues #2～#11 与 PR #1 已创建。
+当前待办与决策入口：
 
-仍需完成：
-
- feature/issue-104-empty-pr
-1. 将 `.github/CODEOWNERS` 中的 `@TODO-replace-*` 占位符替换为真实 GitHub 用户名 / 团队名。
-2. 配置 `main` 分支保护：要求 PR、至少 1 名评审、CI 通过。
-3. 按 `.github/ISSUE_TEMPLATE/` 与看板方案创建标签与看板列。
-第 6 周空 PR 演练：仅文档变更，无业务代码。
-
-1. 替换 `.github/CODEOWNERS` 中的 `@TODO-replace-*` 占位符。
-2. 配置 `main` 分支保护：要求 PR、至少 1 名非作者评审。
-3. 完善看板字段、Workflows 与成员访问权限。
-4. 非作者评审 PR #1 后合并。
+- MVP1 任务及状态：[`plans/mvp1-plan.md`](./plans/mvp1-plan.md)；当前 12 项任务均为 Backlog。
+- AI 阅卷实测与决策：[`PR #52`](https://github.com/AI-exam-team/ai-exam-system/pull/52) 和 [`ADR-003`](./adr/ADR-003-grading-ai-invocation-and-idempotency.md)。
+- 协作配置：`.github/CODEOWNERS` 的前端 owner 仍待小组确认；分支保护与 CI 门禁需要在 GitHub 仓库设置中核实并落实。
+- 第 6 周验收与空 PR 演练文档是历史记录，不代表当前阶段或远端状态。
 
 团队协作细节见 [`docs/team-guide.md`](./docs/team-guide.md)。
  main
